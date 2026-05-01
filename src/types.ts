@@ -17,3 +17,9 @@ export interface StateSnapshot {
 export type ParticipantMessage =
   | { type: 'join'; name: string; clientId: string }
   | { type: 'vote'; value: VoteValue | null };
+
+/** Messages sent from host to participants (besides StateSnapshot). */
+export type HostMessage =
+  | StateSnapshot
+  | { type: 'kicked' }
+  | { type: 'rejected' };

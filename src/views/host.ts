@@ -28,6 +28,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   let timerInterval: ReturnType<typeof setInterval> | null = null;
   let setupTimerSeconds: number | null = null;
   let resetSecs = 60;
+  let meetingLocked = false;
+  const allowedClients = new Set<string>();
+  const bannedClients  = new Set<string>();
 
   participants.set('host', { name: hostName, conn: null });
 
@@ -43,11 +46,16 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
             <button id="copy-code-btn" class="btn btn-ghost btn-sm">Copy code</button>
             <button id="copy-link-btn" class="btn btn-ghost btn-sm">Copy link</button>
             <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Starting…</span>
+            <button id="lock-meeting-btn" class="btn btn-ghost btn-sm" style="width:6.5rem">🔒 Lock</button>
             <button class="btn btn-danger btn-sm end-meeting-btn">End meeting</button>
           </div>
         </div>
 
         <div id="error-msg" class="error-msg" style="display:none;margin-bottom:1rem"></div>
+
+        <div id="topic-display" class="topic-box" style="display:none;margin-bottom:0.75rem">
+          <span class="topic-placeholder">No topic set</span>
+        </div>
 
         <div class="host-grid">
 
@@ -95,41 +103,28 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
             <!-- ACTIVE PANEL -->
             <div id="active-panel" style="display:none">
 
-              <div id="topic-display" class="topic-box" style="margin-bottom:0.75rem">
-                <span class="topic-placeholder">No topic set</span>
-              </div>
-
               <div class="tally-grid" id="tally-grid" style="margin-bottom:0.375rem">
-                <div class="tally-card up" id="tally-card-up">
+                <button class="tally-card up host-vote-btn" id="tally-card-up" data-value="up">
                   <div class="tally-icon">👍</div>
                   <div class="tally-count" id="tally-up">0</div>
                   <div class="tally-label">Continue</div>
-                </div>
-                <div class="tally-card neutral" id="tally-card-neutral">
+                </button>
+                <button class="tally-card neutral host-vote-btn" id="tally-card-neutral" data-value="sideways">
                   <div class="tally-icon">👉</div>
                   <div class="tally-count" id="tally-neutral">0</div>
                   <div class="tally-label">Either way</div>
-                </div>
-                <div class="tally-card down" id="tally-card-down">
+                </button>
+                <button class="tally-card down host-vote-btn" id="tally-card-down" data-value="down">
                   <div class="tally-icon">👎</div>
                   <div class="tally-count" id="tally-down">0</div>
                   <div class="tally-label">Move on</div>
-                </div>
+                </button>
               </div>
               <div id="voting-status" class="voting-status" style="margin-bottom:0.5rem"></div>
 
-              <div id="timer-running-box" class="timer-box" style="display:none;margin-bottom:0.75rem">
-                <span class="timer-box-label">Time remaining</span>
+              <div id="timer-running-box" class="timer-compact" style="display:none;margin-bottom:0.75rem">
+                <span class="timer-compact-label">⏱ Time remaining</span>
                 <span id="timer-countdown" class="timer-countdown">1:00</span>
-              </div>
-
-              <div class="panel" style="margin-bottom:0.75rem">
-                <div class="section-label">Your vote</div>
-                <div class="vote-buttons" style="justify-content:flex-start">
-                  <button class="vote-btn host-vote-btn" data-value="up"><span class="vote-icon">👍</span><span class="vote-label">Continue</span></button>
-                  <button class="vote-btn host-vote-btn" data-value="sideways"><span class="vote-icon">👉</span><span class="vote-label">Either way</span></button>
-                  <button class="vote-btn host-vote-btn" data-value="down"><span class="vote-icon">👎</span><span class="vote-label">Move on</span></button>
-                </div>
               </div>
 
               <div class="controls-row">
@@ -162,6 +157,18 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
         </div>
       </div>
+
+      <div id="modal-backdrop" class="modal-backdrop" style="display:none">
+        <div class="modal-card">
+          <div class="modal-title" id="modal-title"></div>
+          <div class="modal-body" id="modal-body"></div>
+          <div class="modal-actions">
+            <button id="modal-cancel-btn" class="btn btn-ghost">Cancel</button>
+            <button id="modal-confirm-btn" class="btn btn-danger">Confirm</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   `;
 
@@ -180,17 +187,27 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   });
 
   peer.on('connection', (conn) => {
-    conn.on('open', () => sendStateTo(conn));
-
     conn.on('data', (raw) => {
       const msg = raw as ParticipantMessage;
       if (msg.type === 'join') {
         const { clientId, name } = msg;
+        if (bannedClients.has(clientId)) {
+          try { conn.send({ type: 'kicked' }); } catch { /* ignore */ }
+          conn.close();
+          return;
+        }
+        if (meetingLocked && !allowedClients.has(clientId)) {
+          try { conn.send({ type: 'rejected' }); } catch { /* ignore */ }
+          conn.close();
+          return;
+        }
+        allowedClients.add(clientId);
         for (const [pid, cid] of peerToClient) {
           if (cid === clientId && pid !== conn.peer) peerToClient.delete(pid);
         }
         peerToClient.set(conn.peer, clientId);
         participants.set(clientId, { name, conn });
+        sendStateTo(conn);
       } else if (msg.type === 'vote') {
         const clientId = peerToClient.get(conn.peer);
         if (clientId && votingActive && !votingLocked) {
@@ -247,8 +264,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     votingLocked  = false;
     roundId       = String(Date.now());
 
-    container.querySelector<HTMLElement>('#setup-panel')!.style.display  = 'none';
-    container.querySelector<HTMLElement>('#active-panel')!.style.display = '';
+    container.querySelector<HTMLElement>('#setup-panel')!.style.display   = 'none';
+    container.querySelector<HTMLElement>('#active-panel')!.style.display  = '';
+    container.querySelector<HTMLElement>('#topic-display')!.style.display = '';
 
     if (setupTimerSeconds !== null) startTimer(setupTimerSeconds);
 
@@ -274,8 +292,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     updateVoteButtons(null);
     updateLockUI();
 
-    container.querySelector<HTMLElement>('#setup-panel')!.style.display  = '';
-    container.querySelector<HTMLElement>('#active-panel')!.style.display = 'none';
+    container.querySelector<HTMLElement>('#setup-panel')!.style.display   = '';
+    container.querySelector<HTMLElement>('#active-panel')!.style.display  = 'none';
+    container.querySelector<HTMLElement>('#topic-display')!.style.display = 'none';
 
     broadcast();
     refreshUI();
@@ -313,13 +332,35 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   });
 
+  // ── Modal ─────────────────────────────────────────────────────────────────
+  function showModal(title: string, body: string, confirmLabel: string, onConfirm: () => void) {
+    (container.querySelector('#modal-title') as HTMLElement).textContent = title;
+    (container.querySelector('#modal-body')  as HTMLElement).textContent = body;
+    const confirmBtn = container.querySelector<HTMLButtonElement>('#modal-confirm-btn')!;
+    confirmBtn.textContent = confirmLabel;
+    const backdrop = container.querySelector<HTMLElement>('#modal-backdrop')!;
+    backdrop.style.display = '';
+
+    const finish = (run: boolean) => {
+      backdrop.style.display = 'none';
+      confirmBtn.onclick = null;
+      cancelBtn.onclick  = null;
+      backdrop.onclick   = null;
+      if (run) onConfirm();
+    };
+    const cancelBtn = container.querySelector<HTMLButtonElement>('#modal-cancel-btn')!;
+    confirmBtn.onclick = () => finish(true);
+    cancelBtn.onclick  = () => finish(false);
+    backdrop.onclick   = (e) => { if (e.target === backdrop) finish(false); };
+  }
+
   // ── End meeting (both panels) ─────────────────────────────────────────────
   container.querySelectorAll('.end-meeting-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      if (confirm('End the meeting? All vote data will be lost.')) {
+      showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
         peer.destroy();
         window.location.hash = '/';
-      }
+      });
     });
   });
 
@@ -337,6 +378,18 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     btn.textContent = '✓ Copied';
     setTimeout(() => (btn.textContent = 'Copy link'), 2000);
   });
+
+  // ── Lock meeting ──────────────────────────────────────────────────────────
+  container.querySelector('#lock-meeting-btn')!.addEventListener('click', () => {
+    meetingLocked = !meetingLocked;
+    updateLockMeetingBtn();
+  });
+
+  function updateLockMeetingBtn() {
+    const btn = container.querySelector<HTMLButtonElement>('#lock-meeting-btn')!;
+    btn.textContent = meetingLocked ? '🔓 Unlock' : '🔒 Lock';
+    btn.classList.toggle('btn-selected', meetingLocked);
+  }
 
   // ── Host vote buttons ─────────────────────────────────────────────────────
   container.querySelectorAll<HTMLButtonElement>('.host-vote-btn').forEach((btn) => {
@@ -431,17 +484,44 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
               ? `<span class="voted-badge">✓ voted</span>`
               : `<span class="waiting-badge">waiting…</span>`)
           : '';
-        return `<li class="participant-item"><span>${escHtml(p.name)}${tag}</span>${badge}</li>`;
+        const kickBtn = id !== 'host'
+          ? `<button class="kick-btn" data-cid="${escHtml(id)}" title="Remove from meeting">✕</button>`
+          : '';
+        return `<li class="participant-item"><span>${escHtml(p.name)}${tag}</span><span>${badge}</span><span>${kickBtn}</span></li>`;
       })
       .join('');
+
+    list.querySelectorAll<HTMLButtonElement>('.kick-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cid  = btn.getAttribute('data-cid')!;
+        const name = participants.get(cid)?.name ?? 'this participant';
+        showModal('Remove participant', `Remove ${escHtml(name)} from the meeting?`, 'Remove', () => kickParticipant(cid));
+      });
+    });
+  }
+
+  function kickParticipant(clientId: string) {
+    for (const [pid, cid] of peerToClient) {
+      if (cid === clientId) { peerToClient.delete(pid); break; }
+    }
+    const entry = participants.get(clientId);
+    if (entry?.conn?.open) {
+      try { entry.conn.send({ type: 'kicked' }); } catch { /* ignore */ }
+      entry.conn.close();
+    }
+    participants.delete(clientId);
+    votes.delete(clientId);
+    allowedClients.delete(clientId);
+    bannedClients.add(clientId);
+    broadcast();
+    refreshUI();
   }
 
   function updateVoteButtons(selected: VoteValue | null) {
     container.querySelectorAll('.host-vote-btn').forEach(btn =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
-    container.querySelector('.host-vote-btn')?.closest('.vote-buttons')
-      ?.classList.toggle('has-selection', selected !== null);
+    container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function updateLockUI() {

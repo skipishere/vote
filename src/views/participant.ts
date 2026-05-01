@@ -62,62 +62,62 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
   container.innerHTML = `
     <div class="page" style="justify-content:center;gap:1.25rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:440px">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:860px">
         <div class="logo">☕ Lean Coffee Vote</div>
-        <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Connecting…</span>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Connecting…</span>
+          <button id="leave-btn" class="btn btn-danger btn-sm">Leave</button>
+        </div>
       </div>
 
-      <div id="error-msg" class="error-msg" style="display:none;width:100%;max-width:440px"></div>
+      <div id="error-msg" class="error-msg" style="display:none;width:100%;max-width:860px"></div>
 
       <!-- Shown before host starts the vote -->
-      <div id="waiting-view" class="topic-box" style="width:100%;max-width:440px">
+      <div id="waiting-view" class="topic-box" style="width:100%;max-width:860px">
         <span class="topic-placeholder">⏳ Waiting for host to start the vote…</span>
       </div>
 
       <!-- Shown once votingActive = true; display:contents makes children direct flex items -->
-      <div id="voting-view" style="display:none;width:100%;max-width:440px">
+      <div id="voting-view" style="display:none;width:100%;max-width:860px">
 
       <div class="topic-box" id="topic-box"></div>
-
-      <div id="timer-box" class="timer-box" style="display:none">
-        <span class="timer-box-label">Time remaining</span>
-        <span id="timer-display" class="timer-countdown">0:00</span>
-      </div>
-
-      <div class="vote-buttons" id="vote-buttons">
-        <button class="vote-btn" data-value="up" disabled><span class="vote-icon">👍</span><span class="vote-label">Continue</span></button>
-        <button class="vote-btn" data-value="sideways" disabled><span class="vote-icon">👉</span><span class="vote-label">Either way</span></button>
-        <button class="vote-btn" data-value="down" disabled><span class="vote-icon">👎</span><span class="vote-label">Move on</span></button>
-      </div>
-
-      <div id="lock-banner" class="lock-banner" style="display:none">🔒 Voting closed</div>
 
       <div style="width:100%">
         <div class="section-label" id="voted-count" style="text-align:center;margin-bottom:0.625rem">0 of 0 voted</div>
         <div class="tally-grid" id="p-tally-grid">
-          <div class="tally-card up" id="p-tally-card-up">
+          <button class="tally-card up p-vote-btn" id="p-tally-card-up" data-value="up" disabled>
             <div class="tally-icon">👍</div>
             <div class="tally-count" id="p-tally-up">—</div>
             <div class="tally-label">Continue</div>
-          </div>
-          <div class="tally-card neutral" id="p-tally-card-neutral">
+          </button>
+          <button class="tally-card neutral p-vote-btn" id="p-tally-card-neutral" data-value="sideways" disabled>
             <div class="tally-icon">👉</div>
             <div class="tally-count" id="p-tally-neutral">—</div>
             <div class="tally-label">Either way</div>
-          </div>
-          <div class="tally-card down" id="p-tally-card-down">
+          </button>
+          <button class="tally-card down p-vote-btn" id="p-tally-card-down" data-value="down" disabled>
             <div class="tally-icon">👎</div>
             <div class="tally-count" id="p-tally-down">—</div>
             <div class="tally-label">Move on</div>
-          </div>
+          </button>
         </div>
       </div>
 
-      </div> <!-- /voting-view -->
+      <div id="timer-box" class="timer-compact" style="display:none">
+        <span class="timer-compact-label">⏱ Time remaining</span>
+        <span id="timer-display" class="timer-countdown">0:00</span>
+      </div>
 
-      <a href="#/" style="font-size:0.875rem;color:var(--text-muted)">← Leave meeting</a>
+      <div id="lock-banner" class="voting-status" style="margin-bottom:0"></div>
+
+      </div> <!-- /voting-view -->
     </div>
   `;
+
+  container.querySelector('#leave-btn')!.addEventListener('click', () => {
+    peer.destroy();
+    window.location.hash = '/';
+  });
 
   // ── PeerJS ────────────────────────────────────────────────────────────────
   const peer = new Peer();
@@ -132,6 +132,19 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     });
 
     conn.on('data', (raw) => {
+      const msg = raw as { type: string };
+      if (msg.type === 'kicked') {
+        showError('You have been removed from this meeting. <a href="#/">Return home</a>');
+        setStatus('disconnected', 'Removed');
+        enableButtons(false);
+        return;
+      }
+      if (msg.type === 'rejected') {
+        showError('This meeting is locked — no new participants can join. <a href="#/">Return home</a>');
+        setStatus('disconnected', 'Locked out');
+        enableButtons(false);
+        return;
+      }
       const snap = raw as StateSnapshot;
       if (snap.type !== 'state') return;
 
@@ -168,7 +181,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   });
 
   // ── Vote buttons ──────────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.p-vote-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!conn?.open) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -231,8 +244,9 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     }
 
     // Locked state
-    const lockBanner = container.querySelector<HTMLElement>('#lock-banner')!;
-    lockBanner.style.display = snap.votingLocked ? '' : 'none';
+    const lockStatus = container.querySelector<HTMLElement>('#lock-banner')!;
+    lockStatus.textContent = snap.votingLocked ? '🔒 Vote ended' : '';
+    lockStatus.classList.toggle('locked', snap.votingLocked);
     enableButtons(!snap.votingLocked); // votingActive is guaranteed true here
 
     // Reconcile own vote (handles round resets from host)
@@ -274,14 +288,14 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
   // ── Misc helpers ──────────────────────────────────────────────────────────
   function highlightVote(selected: VoteValue | null) {
-    container.querySelectorAll('.vote-btn').forEach((btn) =>
+    container.querySelectorAll('.p-vote-btn').forEach((btn) =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
-    container.querySelector('#vote-buttons')?.classList.toggle('has-selection', selected !== null);
+    container.querySelector('#p-tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function enableButtons(enabled: boolean) {
-    container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
+    container.querySelectorAll<HTMLButtonElement>('.p-vote-btn').forEach((btn) => {
       btn.disabled = !enabled;
     });
   }
