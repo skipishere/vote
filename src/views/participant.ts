@@ -1,24 +1,21 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
-import { getUserName, setUserName, escHtml } from '../utils';
+import { getClientId, getUserName, setUserName, escHtml, getWinner } from '../utils';
 
 export function renderParticipant(container: HTMLElement, roomCode: string): () => void {
-  // If no name stored, show name entry before connecting
   const storedName = getUserName();
-  if (!storedName) {
-    return renderNameGate(container, roomCode);
-  }
+  if (!storedName) return renderNameGate(container, roomCode);
   return renderVoteUI(container, roomCode, storedName);
 }
 
-// ── Name gate (shown when navigating directly from a shared link) ────────────
+// ── Name gate (shown when arriving via a shared link with no stored name) ────
 
 function renderNameGate(container: HTMLElement, roomCode: string): () => void {
   container.innerHTML = `
     <div class="page" style="justify-content:center;gap:1.5rem">
       <div class="logo">☕ Lean Coffee Vote</div>
       <div class="card">
-        <h2>Join meeting <span style="font-family:monospace;letter-spacing:0.1em">${escHtml(roomCode)}</span></h2>
+        <h2>Join <span style="font-family:monospace;letter-spacing:0.1em">${escHtml(roomCode)}</span></h2>
         <div class="form-group">
           <label for="name-input">Your name</label>
           <input id="name-input" type="text" placeholder="e.g. Alex" maxlength="40" autocomplete="nickname" />
@@ -31,8 +28,7 @@ function renderNameGate(container: HTMLElement, roomCode: string): () => void {
 
   const nameInput = container.querySelector<HTMLInputElement>('#name-input')!;
   nameInput.focus();
-
-  let cleanup: (() => void) = () => {};
+  let cleanup: () => void = () => {};
 
   function submit() {
     const name = nameInput.value.trim();
@@ -56,10 +52,13 @@ function renderNameGate(container: HTMLElement, roomCode: string): () => void {
 
 function renderVoteUI(container: HTMLElement, roomCode: string, userName: string): () => void {
   const hostPeerId = 'lcv-' + roomCode.toLowerCase();
-  let myPeerId = '';
+  const myClientId = getClientId(); // stable across reconnects
+
   let currentVote: VoteValue | null = null;
   let currentRoundId = '';
   let conn: DataConnection | null = null;
+  let timerInterval: ReturnType<typeof setInterval> | null = null;
+  let displayedTimerEndsAt: number | null = null;
 
   container.innerHTML = `
     <div class="page" style="justify-content:center;gap:1.25rem">
@@ -70,8 +69,19 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
       <div id="error-msg" class="error-msg" style="display:none;width:100%;max-width:440px"></div>
 
-      <div class="topic-box" id="topic-box">
-        <span class="topic-placeholder">Waiting for host…</span>
+      <!-- Shown before host starts the vote -->
+      <div id="waiting-view" class="topic-box" style="width:100%;max-width:440px">
+        <span class="topic-placeholder">⏳ Waiting for host to start the vote…</span>
+      </div>
+
+      <!-- Shown once votingActive = true; display:contents makes children direct flex items -->
+      <div id="voting-view" style="display:none;width:100%;max-width:440px">
+
+      <div class="topic-box" id="topic-box"></div>
+
+      <div id="timer-box" class="timer-box" style="display:none">
+        <span class="timer-box-label">Time remaining</span>
+        <span id="timer-display" class="timer-countdown">0:00</span>
       </div>
 
       <div class="vote-buttons" id="vote-buttons">
@@ -80,29 +90,43 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
         <button class="vote-btn" data-value="down" disabled><span class="vote-icon">👎</span><span class="vote-label">Move on</span></button>
       </div>
 
-      <div class="vote-summary">
-        <div class="section-label" id="voted-count" style="margin-bottom:0.75rem">0 of 0 voted</div>
-        <div class="summary-row">
-          <div class="mini-tally up"><span class="mini-icon">👍</span><span class="mini-count" id="sum-up">0</span></div>
-          <div class="mini-tally neutral"><span class="mini-icon">👉</span><span class="mini-count" id="sum-neutral">0</span></div>
-          <div class="mini-tally down"><span class="mini-icon">👎</span><span class="mini-count" id="sum-down">0</span></div>
+      <div id="lock-banner" class="lock-banner" style="display:none">🔒 Voting closed</div>
+
+      <div style="width:100%">
+        <div class="section-label" id="voted-count" style="text-align:center;margin-bottom:0.625rem">0 of 0 voted</div>
+        <div class="tally-grid" id="p-tally-grid">
+          <div class="tally-card up" id="p-tally-card-up">
+            <div class="tally-icon">👍</div>
+            <div class="tally-count" id="p-tally-up">—</div>
+            <div class="tally-label">Continue</div>
+          </div>
+          <div class="tally-card neutral" id="p-tally-card-neutral">
+            <div class="tally-icon">👉</div>
+            <div class="tally-count" id="p-tally-neutral">—</div>
+            <div class="tally-label">Either way</div>
+          </div>
+          <div class="tally-card down" id="p-tally-card-down">
+            <div class="tally-icon">👎</div>
+            <div class="tally-count" id="p-tally-down">—</div>
+            <div class="tally-label">Move on</div>
+          </div>
         </div>
       </div>
+
+      </div> <!-- /voting-view -->
 
       <a href="#/" style="font-size:0.875rem;color:var(--text-muted)">← Leave meeting</a>
     </div>
   `;
 
   // ── PeerJS ────────────────────────────────────────────────────────────────
-
   const peer = new Peer();
 
-  peer.on('open', (id) => {
-    myPeerId = id;
+  peer.on('open', () => {
     conn = peer.connect(hostPeerId, { reliable: true });
 
     conn.on('open', () => {
-      conn!.send({ type: 'join', name: userName });
+      conn!.send({ type: 'join', name: userName, clientId: myClientId });
       setStatus('connected', 'Live');
       enableButtons(true);
     });
@@ -112,9 +136,9 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
       if (snap.type !== 'state') return;
 
       if (snap.roundId !== currentRoundId) {
-        // New round — clear local vote state
         currentRoundId = snap.roundId;
         currentVote = null;
+        highlightVote(null); // clear immediately — don't wait for reconciliation below
       }
 
       applySnapshot(snap);
@@ -124,6 +148,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
       setStatus('disconnected', 'Disconnected');
       enableButtons(false);
       showError('The host has ended the meeting. <a href="#/">Return home</a>');
+      clearTimer();
     });
 
     conn.on('error', () => {
@@ -134,17 +159,15 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
   peer.on('error', (err) => {
     const type = (err as { type?: string }).type;
-    if (type === 'peer-unavailable') {
-      showError('Meeting not found. Check the room code or ask the host to confirm they\'re connected. <a href="#/">Try again</a>');
-    } else {
-      showError(`Connection error: ${err.message}`);
-    }
+    const msg = type === 'peer-unavailable'
+      ? `Meeting not found. Check the room code or wait for the host to connect. <a href="#/">Try again</a>`
+      : `Connection error: ${err.message}`;
+    showError(msg);
     setStatus('disconnected', 'Error');
     enableButtons(false);
   });
 
   // ── Vote buttons ──────────────────────────────────────────────────────────
-
   container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!conn?.open) return;
@@ -160,37 +183,101 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     });
   });
 
-  // ── UI helpers ────────────────────────────────────────────────────────────
-
+  // ── Snapshot application ──────────────────────────────────────────────────
   function applySnapshot(snap: StateSnapshot) {
+    // Toggle waiting / voting views
+    (container.querySelector<HTMLElement>('#waiting-view')!).style.display = snap.votingActive ? 'none' : '';
+    const votingView = container.querySelector<HTMLElement>('#voting-view')!;
+    votingView.style.display = snap.votingActive ? 'flex' : 'none';
+    votingView.style.flexDirection = 'column';
+    votingView.style.gap = '1.25rem';
+
+    if (!snap.votingActive) return; // nothing else to update while waiting
+
     // Topic
     const topicBox = container.querySelector('#topic-box')!;
     topicBox.innerHTML = snap.topic
       ? `<span class="topic-text">${escHtml(snap.topic)}</span>`
       : `<span class="topic-placeholder">No topic set</span>`;
 
-    // Tallies
-    const vs = Object.values(snap.votes);
-    (container.querySelector('#sum-up')     as HTMLElement).textContent = String(vs.filter(v => v === 'up').length);
-    (container.querySelector('#sum-neutral')as HTMLElement).textContent = String(vs.filter(v => v === 'sideways').length);
-    (container.querySelector('#sum-down')   as HTMLElement).textContent = String(vs.filter(v => v === 'down').length);
-
+    // Voted count
     const total = Object.keys(snap.participants).length;
-    (container.querySelector('#voted-count') as HTMLElement).textContent =
-      `${vs.length} of ${total} voted`;
+    const votedN = Object.keys(snap.votes).length;
+    (container.querySelector('#voted-count') as HTMLElement).textContent = `${votedN} of ${total} voted`;
 
-    // Reconcile our own vote from server state (handles round resets from host)
-    const serverVote = (snap.votes[myPeerId] as VoteValue | undefined) ?? null;
+    // Tally counts + winner highlight
+    const vs = Object.values(snap.votes);
+    const upCount      = vs.filter(v => v === 'up').length;
+    const neutralCount = vs.filter(v => v === 'sideways').length;
+    const downCount    = vs.filter(v => v === 'down').length;
+    const hidden = snap.resultsHidden;
+
+    (container.querySelector('#p-tally-up')      as HTMLElement).textContent = hidden ? '?' : String(upCount);
+    (container.querySelector('#p-tally-neutral') as HTMLElement).textContent = hidden ? '?' : String(neutralCount);
+    (container.querySelector('#p-tally-down')    as HTMLElement).textContent = hidden ? '?' : String(downCount);
+    ['p-tally-up', 'p-tally-neutral', 'p-tally-down'].forEach(id =>
+      container.querySelector(`#${id}`)?.classList.toggle('hidden-count', hidden)
+    );
+
+    const pGrid = container.querySelector('#p-tally-grid')!;
+    ['p-tally-card-up', 'p-tally-card-neutral', 'p-tally-card-down'].forEach(id =>
+      container.querySelector(`#${id}`)?.classList.remove('winner')
+    );
+    const showWinner = snap.votingLocked && !hidden;
+    pGrid.classList.toggle('has-winner', showWinner);
+    if (showWinner) {
+      const winner = getWinner(upCount, neutralCount, downCount);
+      container.querySelector(`#${winner === 'up' ? 'p-tally-card-up' : 'p-tally-card-down'}`)?.classList.add('winner');
+    }
+
+    // Locked state
+    const lockBanner = container.querySelector<HTMLElement>('#lock-banner')!;
+    lockBanner.style.display = snap.votingLocked ? '' : 'none';
+    enableButtons(!snap.votingLocked); // votingActive is guaranteed true here
+
+    // Reconcile own vote (handles round resets from host)
+    const serverVote = (snap.votes[myClientId] as VoteValue | undefined) ?? null;
     if (serverVote !== currentVote) {
       currentVote = serverVote;
       highlightVote(currentVote);
     }
+
+    // Timer
+    updateTimer(snap.timerEndsAt);
   }
 
+  // ── Timer ─────────────────────────────────────────────────────────────────
+  function updateTimer(endsAt: number | null) {
+    if (endsAt === displayedTimerEndsAt) return;
+    displayedTimerEndsAt = endsAt;
+    clearTimer();
+
+    const timerBox = container.querySelector<HTMLElement>('#timer-box')!;
+    if (!endsAt) { timerBox.style.display = 'none'; return; }
+
+    timerBox.style.display = '';
+    tick(endsAt);
+    timerInterval = setInterval(() => tick(endsAt), 500);
+  }
+
+  function tick(endsAt: number) {
+    const remaining = endsAt - Date.now();
+    const display = container.querySelector<HTMLElement>('#timer-display')!;
+    display.textContent = formatTime(remaining);
+    display.classList.toggle('urgent', remaining <= 10_000 && remaining > 0);
+    if (remaining <= 0) clearTimer();
+  }
+
+  function clearTimer() {
+    if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  // ── Misc helpers ──────────────────────────────────────────────────────────
   function highlightVote(selected: VoteValue | null) {
     container.querySelectorAll('.vote-btn').forEach((btn) =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
+    container.querySelector('#vote-buttons')?.classList.toggle('has-selection', selected !== null);
   }
 
   function enableButtons(enabled: boolean) {
@@ -211,5 +298,15 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     el.style.display = '';
   }
 
-  return () => { peer.destroy(); };
+  return () => {
+    clearTimer();
+    peer.destroy();
+  };
+}
+
+function formatTime(ms: number): string {
+  const secs = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
