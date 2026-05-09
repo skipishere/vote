@@ -7,12 +7,12 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" data-tab="create">Host a meeting</button>
-      <button class="tab-btn" data-tab="join">Join a meeting</button>
+      <button class="active" data-tab="create">Host a meeting</button>
+      <button data-tab="join">Join a meeting</button>
     </div>
 
     <div id="panel-create" class="tab-panel active">
-      <button id="create-btn" class="btn btn-primary btn-full">Create meeting</button>
+      <button id="create-btn" class="btn-primary btn-full">Create meeting</button>
     </div>
 
     <div id="panel-join" class="tab-panel">
@@ -21,9 +21,9 @@
         <input id="code-input" type="text" placeholder="e.g. ABC123" maxlength="6"
           autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
       </div>
-      <button id="join-btn" class="btn btn-primary btn-full">Join meeting</button>
+      <button id="join-btn" class="btn-primary btn-full">Join meeting</button>
     </div>
 
-    <div id="error-msg" class="error-msg mt-sm hidden"></div>
+    <div id="error-msg" class="error-msg mt-sm" hidden></div>
   </div>
 </div>

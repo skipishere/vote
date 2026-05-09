@@ -26,7 +26,7 @@ function renderNameGate(container: HTMLElement, roomCode: string): () => void {
     if (!name) {
       const el = container.querySelector<HTMLElement>('#error-msg')!;
       el.textContent = 'Please enter your name.';
-      el.classList.remove('hidden');
+      el.hidden = false;
       return;
     }
     setUserName(name);
@@ -120,7 +120,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   });
 
   // ── Vote buttons ──────────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!conn?.open) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -138,8 +138,8 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   // ── Snapshot application ──────────────────────────────────────────────────
   function applySnapshot(snap: StateSnapshot) {
     // Toggle waiting / voting views
-    container.querySelector('#waiting-view')!.classList.toggle('hidden', snap.votingActive);
-    container.querySelector('#voting-view')!.classList.toggle('hidden', !snap.votingActive);
+    container.querySelector<HTMLElement>('#waiting-view')!.hidden = snap.votingActive;
+    container.querySelector<HTMLElement>('#voting-view')!.hidden = !snap.votingActive;
 
     if (!snap.votingActive) return; // nothing else to update while waiting
 
@@ -202,10 +202,10 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     displayedTimerEndsAt = endsAt;
     clearTimer();
 
-    const timerBox = container.querySelector('#timer-box')!;
-    if (!endsAt) { timerBox.classList.add('hidden'); return; }
+    const timerBox = container.querySelector<HTMLElement>('#timer-box')!;
+    if (!endsAt) { timerBox.hidden = true; return; }
 
-    timerBox.classList.remove('hidden');
+    timerBox.hidden = false;
     tick(endsAt);
     timerInterval = setInterval(() => tick(endsAt), 500);
   }
@@ -224,14 +224,14 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
   // ── Misc helpers ──────────────────────────────────────────────────────────
   function highlightVote(selected: VoteValue | null) {
-    container.querySelectorAll('.tally-btn').forEach((btn) =>
+    container.querySelectorAll('.tally-grid button').forEach((btn) =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
     container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function enableButtons(enabled: boolean) {
-    container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach((btn) => {
+    container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach((btn) => {
       btn.disabled = !enabled;
     });
   }

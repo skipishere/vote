@@ -132,9 +132,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     votingLocked  = false;
     roundId       = String(Date.now());
 
-    container.querySelector('#setup-panel')!.classList.add('hidden');
-    container.querySelector('#active-panel')!.classList.remove('hidden');
-    container.querySelector('#topic-display')!.classList.remove('hidden');
+    container.querySelector<HTMLElement>('#setup-panel')!.hidden = true;
+    container.querySelector<HTMLElement>('#active-panel')!.hidden = false;
+    container.querySelector<HTMLElement>('#topic-display')!.hidden = false;
 
     if (setupTimerSeconds !== null) startTimer(setupTimerSeconds);
 
@@ -160,9 +160,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     updateVoteButtons(null);
     updateLockUI();
 
-    container.querySelector('#setup-panel')!.classList.remove('hidden');
-    container.querySelector('#active-panel')!.classList.add('hidden');
-    container.querySelector('#topic-display')!.classList.add('hidden');
+    container.querySelector<HTMLElement>('#setup-panel')!.hidden = false;
+    container.querySelector<HTMLElement>('#active-panel')!.hidden = true;
+    container.querySelector<HTMLElement>('#topic-display')!.hidden = true;
 
     broadcast();
     refreshUI();
@@ -170,7 +170,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   // ── Active: Reset timer ───────────────────────────────────────────────────
   container.querySelector('#reset-timer-btn')!.addEventListener('click', () => {
-    container.querySelector('#reset-timer-form')!.classList.toggle('hidden');
+    const form = container.querySelector<HTMLElement>('#reset-timer-form')!;
+    form.hidden = !form.hidden;
   });
 
   container.querySelectorAll<HTMLButtonElement>('[data-reset-preset]').forEach((btn) => {
@@ -193,7 +194,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   container.querySelector('#reset-timer-confirm-btn')!.addEventListener('click', () => {
     votingLocked = false;
     startTimer(resetSecs);
-    container.querySelector('#reset-timer-form')!.classList.add('hidden');
+    container.querySelector<HTMLElement>('#reset-timer-form')!.hidden = true;
     updateLockUI();
     broadcast();
     refreshUI();
@@ -206,10 +207,10 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const confirmBtn = container.querySelector<HTMLButtonElement>('#modal-confirm-btn')!;
     confirmBtn.textContent = confirmLabel;
     const backdrop = container.querySelector<HTMLElement>('#modal-backdrop')!;
-    backdrop.classList.remove('hidden');
+    backdrop.hidden = false;
 
     const finish = (run: boolean) => {
-      backdrop.classList.add('hidden');
+      backdrop.hidden = true;
       confirmBtn.onclick = null;
       cancelBtn.onclick  = null;
       backdrop.onclick   = null;
@@ -221,13 +222,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     backdrop.onclick   = (e) => { if (e.target === backdrop) finish(false); };
   }
 
-  // ── End meeting (both panels) ─────────────────────────────────────────────
-  container.querySelectorAll('.end-meeting-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
-        peer.destroy();
-        window.location.hash = '/';
-      });
+  // ── End meeting ───────────────────────────────────────────────────────────
+  container.querySelector('#end-meeting-btn')!.addEventListener('click', () => {
+    showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
+      peer.destroy();
+      window.location.hash = '/';
     });
   });
 
@@ -259,7 +258,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   // ── Host vote buttons ─────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (votingLocked) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -280,8 +279,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   function startTimer(seconds: number) {
     stopTimer();
     timerEndsAt = Date.now() + seconds * 1000;
-    const box = container.querySelector('#timer-running-box')!;
-    box.classList.remove('hidden');
+    const box = container.querySelector<HTMLElement>('#timer-running-box')!;
+    box.hidden = false;
 
     timerInterval = setInterval(() => {
       const remaining = timerEndsAt! - Date.now();
@@ -292,7 +291,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       if (remaining <= 0) {
         stopTimer();
         timerEndsAt = null;
-        box.classList.add('hidden');
+        box.hidden = true;
         endVote();
       }
     }, 500);
@@ -307,7 +306,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     resultsHidden = false;
     stopTimer();
     timerEndsAt = null;
-    container.querySelector('#timer-running-box')!.classList.add('hidden');
+    container.querySelector<HTMLElement>('#timer-running-box')!.hidden = true;
     updateLockUI();
     broadcast();
     refreshUI();
@@ -345,20 +344,20 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const list = container.querySelector('#participant-list')!;
     list.innerHTML = Array.from(participants.entries())
       .map(([id, p]) => {
-        const tag = id === 'host' ? ` <small class="participant-you">(you)</small>` : '';
+        const tag = id === 'host' ? ` <small>(you)</small>` : '';
         const badge = votingActive
           ? (votes.has(id)
               ? `<span class="voted-badge">✓ voted</span>`
               : `<span class="waiting-badge">waiting…</span>`)
           : '';
         const kickBtn = id !== 'host'
-          ? `<button class="kick-btn" data-cid="${escHtml(id)}" title="Remove from meeting">✕</button>`
+          ? `<button data-cid="${escHtml(id)}" title="Remove from meeting">✕</button>`
           : '';
-        return `<li class="participant-item"><span>${escHtml(p.name)}${tag}</span><span>${badge}</span><span>${kickBtn}</span></li>`;
+        return `<li><span>${escHtml(p.name)}${tag}</span><span>${badge}</span><span>${kickBtn}</span></li>`;
       })
       .join('');
 
-    list.querySelectorAll<HTMLButtonElement>('.kick-btn').forEach((btn) => {
+    list.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         const cid  = btn.getAttribute('data-cid')!;
         const name = participants.get(cid)?.name ?? 'this participant';
@@ -385,23 +384,23 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   function updateVoteButtons(selected: VoteValue | null) {
-    container.querySelectorAll('.tally-btn').forEach(btn =>
+    container.querySelectorAll('.tally-grid button').forEach(btn =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
     container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function updateLockUI() {
-    container.querySelector('#end-vote-btn')!.classList.toggle('hidden', votingLocked);
-    container.querySelector('#new-round-btn')!.classList.toggle('hidden', !votingLocked);
-    container.querySelector('#reset-timer-btn')!.classList.toggle('hidden', !votingLocked);
-    if (!votingLocked) container.querySelector('#reset-timer-form')!.classList.add('hidden');
+    container.querySelector<HTMLElement>('#end-vote-btn')!.hidden = votingLocked;
+    container.querySelector<HTMLElement>('#new-round-btn')!.hidden = !votingLocked;
+    container.querySelector<HTMLElement>('#reset-timer-btn')!.hidden = !votingLocked;
+    if (!votingLocked) container.querySelector<HTMLElement>('#reset-timer-form')!.hidden = true;
 
     const statusEl = container.querySelector<HTMLElement>('#voting-status')!;
     statusEl.textContent = votingLocked ? '🔒 Vote ended' : '';
     statusEl.className   = `voting-status${votingLocked ? ' locked' : ''}`;
 
-    container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach(btn => {
+    container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach(btn => {
       btn.disabled = votingLocked;
     });
 

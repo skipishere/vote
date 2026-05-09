@@ -21,11 +21,11 @@ export function renderHome(container: HTMLElement): () => void {
 
   function showError(msg: string) {
     errorMsg.textContent = msg;
-    errorMsg.classList.remove('hidden');
+    errorMsg.hidden = false;
   }
 
   function clearError() {
-    errorMsg.classList.add('hidden');
+    errorMsg.hidden = true;
   }
 
   function getName(): string | null {
@@ -35,7 +35,7 @@ export function renderHome(container: HTMLElement): () => void {
   }
 
   function switchTab(tab: 'create' | 'join') {
-    container.querySelectorAll('.tab-btn').forEach(b =>
+    container.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.getAttribute('data-tab') === tab)
     );
     container.querySelectorAll('.tab-panel').forEach(p =>
@@ -43,7 +43,7 @@ export function renderHome(container: HTMLElement): () => void {
     );
   }
 
-  container.querySelectorAll('.tab-btn').forEach(btn => {
+  container.querySelectorAll('.tabs button').forEach(btn => {
     btn.addEventListener('click', () => {
       clearError();
       switchTab(btn.getAttribute('data-tab') as 'create' | 'join');
@@ -73,7 +73,7 @@ export function renderHome(container: HTMLElement): () => void {
   });
 
   nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') container.querySelector<HTMLButtonElement>('.tab-btn.active')?.click();
+    if (e.key === 'Enter') container.querySelector<HTMLButtonElement>('.tabs button.active')?.click();
   });
 
   return () => {};

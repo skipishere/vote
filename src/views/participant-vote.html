@@ -2,42 +2,42 @@
   <div class="view-header view-container">
     <div class="logo">☕ Lean Coffee Vote</div>
     <div class="view-header-actions">
-      <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Connecting…</span>
-      <button id="leave-btn" class="btn btn-danger btn-sm">Leave</button>
+      <span id="conn-status" class="status-chip status-connecting"><span></span>Connecting…</span>
+      <button id="leave-btn" class="btn-danger btn-sm">Leave</button>
     </div>
   </div>
 
-  <div id="error-msg" class="error-msg hidden view-container"></div>
+  <div id="error-msg" class="error-msg view-container" hidden></div>
 
   <div id="waiting-view" class="topic-box view-container">
     <span class="topic-placeholder">⏳ Waiting for host to start the vote…</span>
   </div>
 
-  <div id="voting-view" class="view-container hidden">
+  <div id="voting-view" class="view-container" hidden>
     <div class="topic-box" id="topic-box"></div>
 
     <div class="section-label" id="voted-count">0 of 0 voted</div>
 
     <div class="tally-grid" id="tally-grid">
-      <button class="tally-card up tally-btn" id="tally-card-up" data-value="up" disabled accesskey="1">
+      <button class="tally-card up" id="tally-card-up" data-value="up" disabled accesskey="1">
         <div class="tally-icon">👍</div>
         <div class="tally-count" id="tally-up">—</div>
         <div class="tally-label">Continue</div>
       </button>
-      <button class="tally-card neutral tally-btn" id="tally-card-neutral" data-value="sideways" disabled accesskey="2">
+      <button class="tally-card neutral" id="tally-card-neutral" data-value="sideways" disabled accesskey="2">
         <div class="tally-icon">✊</div>
         <div class="tally-count" id="tally-neutral">—</div>
         <div class="tally-label">Either way</div>
       </button>
-      <button class="tally-card down tally-btn" id="tally-card-down" data-value="down" disabled accesskey="3">
+      <button class="tally-card down" id="tally-card-down" data-value="down" disabled accesskey="3">
         <div class="tally-icon">👎</div>
         <div class="tally-count" id="tally-down">—</div>
         <div class="tally-label">Move on</div>
       </button>
     </div>
 
-    <div id="timer-box" class="timer-compact hidden">
-      <span class="timer-compact-label">⏱ Time remaining</span>
+    <div id="timer-box" class="timer-compact" hidden>
+      <span>⏱ Time remaining</span>
       <span id="timer-display" class="timer-countdown">0:00</span>
     </div>
 
