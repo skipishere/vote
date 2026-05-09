@@ -1,7 +1,9 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
 import { getClientId, getUserName, setUserName, escHtml, getWinner, formatTime } from '../utils';
-import { tallyGridHtml, timerBoxHtml, setStatus, showError } from './shared';
+import { setStatus, showError } from './shared';
+import nameGateHtml from './participant-gate.html?raw';
+import voteHtml from './participant-vote.html?raw';
 
 export function renderParticipant(container: HTMLElement, roomCode: string): () => void {
   const storedName = getUserName();
@@ -12,20 +14,8 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
 // ── Name gate (shown when arriving via a shared link with no stored name) ────
 
 function renderNameGate(container: HTMLElement, roomCode: string): () => void {
-  container.innerHTML = `
-    <div class="page page-centered">
-      <div class="logo">☕ Lean Coffee Vote</div>
-      <div class="card">
-        <h2>Join <span class="code-mono">${escHtml(roomCode)}</span></h2>
-        <div class="form-group">
-          <label for="name-input">Your name</label>
-          <input id="name-input" type="text" placeholder="e.g. Alex" maxlength="40" autocomplete="nickname" />
-        </div>
-        <button id="join-btn" class="btn btn-primary btn-full">Join</button>
-        <div id="error-msg" class="error-msg mt-sm hidden"></div>
-      </div>
-    </div>
-  `;
+  container.innerHTML = nameGateHtml;
+  container.querySelector<HTMLElement>('#room-code-display')!.textContent = roomCode;
 
   const nameInput = container.querySelector<HTMLInputElement>('#name-input')!;
   nameInput.focus();
@@ -61,34 +51,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   let timerInterval: ReturnType<typeof setInterval> | null = null;
   let displayedTimerEndsAt: number | null = null;
 
-  container.innerHTML = `
-    <div class="page page-centered">
-      <div class="view-header view-container">
-        <div class="logo">☕ Lean Coffee Vote</div>
-        <div class="view-header-actions">
-          <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Connecting…</span>
-          <button id="leave-btn" class="btn btn-danger btn-sm">Leave</button>
-        </div>
-      </div>
-
-      <div id="error-msg" class="error-msg hidden view-container"></div>
-
-      <div id="waiting-view" class="topic-box view-container">
-        <span class="topic-placeholder">⏳ Waiting for host to start the vote…</span>
-      </div>
-
-      <div id="voting-view" class="view-container hidden">
-        <div class="topic-box" id="topic-box"></div>
-
-        <div class="section-label" id="voted-count">0 of 0 voted</div>
-        ${tallyGridHtml(true, '—')}
-
-        ${timerBoxHtml('timer-box', 'timer-display')}
-
-        <div id="lock-banner" class="voting-status"></div>
-      </div>
-    </div>
-  `;
+  container.innerHTML = voteHtml;
 
   container.querySelector('#leave-btn')!.addEventListener('click', () => {
     peer.destroy();

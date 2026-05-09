@@ -1,7 +1,8 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
 import { getUserName, copyText, escHtml, getWinner, formatTime } from '../utils';
-import { tallyGridHtml, timerBoxHtml, setStatus, showError } from './shared';
+import { setStatus, showError } from './shared';
+import hostHtml from './host.html?raw';
 
 interface ParticipantEntry {
   name: string;
@@ -36,123 +37,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   participants.set('host', { name: hostName, conn: null });
 
   // ── Render ────────────────────────────────────────────────────────────────
-  container.innerHTML = `
-    <div class="page">
-      <div class="view-container">
-
-        <div class="view-header">
-          <div class="logo">☕ Lean Coffee Vote</div>
-          <div class="view-header-actions">
-            <span class="room-code-badge">${escHtml(roomCode)}</span>
-            <button id="copy-code-btn" class="btn btn-ghost btn-sm">Copy code</button>
-            <button id="copy-link-btn" class="btn btn-ghost btn-sm">Copy link</button>
-            <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Starting…</span>
-            <button id="lock-meeting-btn" class="btn btn-ghost btn-sm">🔒 Lock</button>
-            <button class="btn btn-danger btn-sm end-meeting-btn">End meeting</button>
-          </div>
-        </div>
-
-        <div id="error-msg" class="error-msg hidden"></div>
-
-        <div id="topic-display" class="topic-box hidden">
-          <span class="topic-placeholder">No topic set</span>
-        </div>
-
-        <div class="host-grid">
-
-          <!-- Left: phase-dependent content -->
-          <div>
-
-            <!-- SETUP PANEL -->
-            <div id="setup-panel" class="panel">
-              <div class="section-label">Topic</div>
-              <input id="topic-input" type="text" placeholder="What are we discussing? (optional)" maxlength="120" />
-
-              <hr class="divider" />
-
-              <div class="section-label">Timer</div>
-              <div class="timer-options">
-                <button class="btn btn-ghost btn-sm btn-selected" data-preset="none">No timer</button>
-                <button class="btn btn-ghost btn-sm" data-preset="60">1m</button>
-                <button class="btn btn-ghost btn-sm" data-preset="120">2m</button>
-                <button class="btn btn-ghost btn-sm" data-preset="300">5m</button>
-                <input id="timer-custom" type="number" min="5" max="600" placeholder="Custom" />
-                <span class="timer-unit">sec</span>
-              </div>
-
-              <hr class="divider" />
-
-              <div class="section-label">Results</div>
-              <div class="radio-group">
-                <label class="radio-label">
-                  <input type="radio" name="results-visibility" value="show" checked />
-                  Show to participants
-                </label>
-                <label class="radio-label">
-                  <input type="radio" name="results-visibility" value="hide" />
-                  Hide until vote ends
-                </label>
-              </div>
-
-              <hr class="divider" />
-
-              <div class="controls-row">
-                <button id="start-btn" class="btn btn-primary">▶ Start vote</button>
-              </div>
-            </div>
-
-            <!-- ACTIVE PANEL -->
-            <div id="active-panel" class="hidden">
-
-              ${tallyGridHtml(false, '0')}
-              <div id="voting-status" class="voting-status"></div>
-
-              ${timerBoxHtml('timer-running-box', 'timer-countdown')}
-
-              <div class="controls-row">
-                <button id="end-vote-btn" class="btn btn-ghost">End vote</button>
-                <button id="new-round-btn" class="btn btn-ghost hidden">↺ New round</button>
-                <button id="reset-timer-btn" class="btn btn-ghost hidden">⏱ Reset timer</button>
-              </div>
-
-              <div id="reset-timer-form" class="hidden">
-                <div class="section-label">Set timer duration</div>
-                <div class="timer-options">
-                  <button class="btn btn-ghost btn-sm btn-selected" data-reset-preset="60">1m</button>
-                  <button class="btn btn-ghost btn-sm" data-reset-preset="120">2m</button>
-                  <button class="btn btn-ghost btn-sm" data-reset-preset="300">5m</button>
-                  <input id="reset-timer-custom" type="number" min="5" max="600" placeholder="Custom" />
-                  <span class="timer-unit">sec</span>
-                  <button id="reset-timer-confirm-btn" class="btn btn-primary btn-sm">▶ Go</button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- Right: participants (always visible) -->
-          <div class="panel">
-            <div class="section-label">Participants</div>
-            <div id="voted-summary" class="voted-summary"></div>
-            <ul id="participant-list" class="participant-list"></ul>
-          </div>
-
-        </div>
-      </div>
-
-      <div id="modal-backdrop" class="modal-backdrop hidden">
-        <div class="modal-card">
-          <div class="modal-title" id="modal-title"></div>
-          <div class="modal-body" id="modal-body"></div>
-          <div class="modal-actions">
-            <button id="modal-cancel-btn" class="btn btn-ghost">Cancel</button>
-            <button id="modal-confirm-btn" class="btn btn-danger">Confirm</button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  `;
+  container.innerHTML = hostHtml;
+  container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
   // ── PeerJS ────────────────────────────────────────────────────────────────
   const peer = new Peer(peerId);
