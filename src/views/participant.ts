@@ -1,6 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
-import { getClientId, getUserName, setUserName, escHtml, getWinner } from '../utils';
+import { getClientId, getUserName, setUserName, escHtml, getWinner, formatTime } from '../utils';
+import { tallyGridHtml, timerBoxHtml, setStatus, showError } from './shared';
 
 export function renderParticipant(container: HTMLElement, roomCode: string): () => void {
   const storedName = getUserName();
@@ -12,16 +13,16 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
 
 function renderNameGate(container: HTMLElement, roomCode: string): () => void {
   container.innerHTML = `
-    <div class="page" style="justify-content:center;gap:1.5rem">
+    <div class="page page-centered">
       <div class="logo">☕ Lean Coffee Vote</div>
       <div class="card">
-        <h2>Join <span style="font-family:monospace;letter-spacing:0.1em">${escHtml(roomCode)}</span></h2>
+        <h2>Join <span class="code-mono">${escHtml(roomCode)}</span></h2>
         <div class="form-group">
           <label for="name-input">Your name</label>
           <input id="name-input" type="text" placeholder="e.g. Alex" maxlength="40" autocomplete="nickname" />
         </div>
         <button id="join-btn" class="btn btn-primary btn-full">Join</button>
-        <div id="error-msg" class="error-msg mt-sm" style="display:none"></div>
+        <div id="error-msg" class="error-msg mt-sm hidden"></div>
       </div>
     </div>
   `;
@@ -35,7 +36,7 @@ function renderNameGate(container: HTMLElement, roomCode: string): () => void {
     if (!name) {
       const el = container.querySelector<HTMLElement>('#error-msg')!;
       el.textContent = 'Please enter your name.';
-      el.style.display = '';
+      el.classList.remove('hidden');
       return;
     }
     setUserName(name);
@@ -61,56 +62,31 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   let displayedTimerEndsAt: number | null = null;
 
   container.innerHTML = `
-    <div class="page" style="justify-content:center;gap:1.25rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:860px">
+    <div class="page page-centered">
+      <div class="view-header view-container">
         <div class="logo">☕ Lean Coffee Vote</div>
-        <div style="display:flex;align-items:center;gap:0.5rem">
+        <div class="view-header-actions">
           <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Connecting…</span>
           <button id="leave-btn" class="btn btn-danger btn-sm">Leave</button>
         </div>
       </div>
 
-      <div id="error-msg" class="error-msg" style="display:none;width:100%;max-width:860px"></div>
+      <div id="error-msg" class="error-msg hidden view-container"></div>
 
-      <!-- Shown before host starts the vote -->
-      <div id="waiting-view" class="topic-box" style="width:100%;max-width:860px">
+      <div id="waiting-view" class="topic-box view-container">
         <span class="topic-placeholder">⏳ Waiting for host to start the vote…</span>
       </div>
 
-      <!-- Shown once votingActive = true; display:contents makes children direct flex items -->
-      <div id="voting-view" style="display:none;width:100%;max-width:860px">
+      <div id="voting-view" class="view-container hidden">
+        <div class="topic-box" id="topic-box"></div>
 
-      <div class="topic-box" id="topic-box"></div>
+        <div class="section-label" id="voted-count">0 of 0 voted</div>
+        ${tallyGridHtml(true, '—')}
 
-      <div style="width:100%">
-        <div class="section-label" id="voted-count" style="text-align:center;margin-bottom:0.625rem">0 of 0 voted</div>
-        <div class="tally-grid" id="p-tally-grid">
-          <button class="tally-card up p-vote-btn" id="p-tally-card-up" data-value="up" disabled>
-            <div class="tally-icon">👍</div>
-            <div class="tally-count" id="p-tally-up">—</div>
-            <div class="tally-label">Continue</div>
-          </button>
-          <button class="tally-card neutral p-vote-btn" id="p-tally-card-neutral" data-value="sideways" disabled>
-            <div class="tally-icon">👉</div>
-            <div class="tally-count" id="p-tally-neutral">—</div>
-            <div class="tally-label">Either way</div>
-          </button>
-          <button class="tally-card down p-vote-btn" id="p-tally-card-down" data-value="down" disabled>
-            <div class="tally-icon">👎</div>
-            <div class="tally-count" id="p-tally-down">—</div>
-            <div class="tally-label">Move on</div>
-          </button>
-        </div>
+        ${timerBoxHtml('timer-box', 'timer-display')}
+
+        <div id="lock-banner" class="voting-status"></div>
       </div>
-
-      <div id="timer-box" class="timer-compact" style="display:none">
-        <span class="timer-compact-label">⏱ Time remaining</span>
-        <span id="timer-display" class="timer-countdown">0:00</span>
-      </div>
-
-      <div id="lock-banner" class="voting-status" style="margin-bottom:0"></div>
-
-      </div> <!-- /voting-view -->
     </div>
   `;
 
@@ -127,21 +103,21 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
     conn.on('open', () => {
       conn!.send({ type: 'join', name: userName, clientId: myClientId });
-      setStatus('connected', 'Live');
+      setStatus(container, 'connected', 'Live');
       enableButtons(true);
     });
 
     conn.on('data', (raw) => {
       const msg = raw as { type: string };
       if (msg.type === 'kicked') {
-        showError('You have been removed from this meeting. <a href="#/">Return home</a>');
-        setStatus('disconnected', 'Removed');
+        showError(container, 'You have been removed from this meeting. <a href="#/">Return home</a>');
+        setStatus(container, 'disconnected', 'Removed');
         enableButtons(false);
         return;
       }
       if (msg.type === 'rejected') {
-        showError('This meeting is locked — no new participants can join. <a href="#/">Return home</a>');
-        setStatus('disconnected', 'Locked out');
+        showError(container, 'This meeting is locked — no new participants can join. <a href="#/">Return home</a>');
+        setStatus(container, 'disconnected', 'Locked out');
         enableButtons(false);
         return;
       }
@@ -158,14 +134,14 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     });
 
     conn.on('close', () => {
-      setStatus('disconnected', 'Disconnected');
+      setStatus(container, 'disconnected', 'Disconnected');
       enableButtons(false);
-      showError('The host has ended the meeting. <a href="#/">Return home</a>');
+      showError(container, 'The host has ended the meeting. <a href="#/">Return home</a>');
       clearTimer();
     });
 
     conn.on('error', () => {
-      setStatus('disconnected', 'Error');
+      setStatus(container, 'disconnected', 'Error');
       enableButtons(false);
     });
   });
@@ -175,13 +151,13 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     const msg = type === 'peer-unavailable'
       ? `Meeting not found. Check the room code or wait for the host to connect. <a href="#/">Try again</a>`
       : `Connection error: ${err.message}`;
-    showError(msg);
-    setStatus('disconnected', 'Error');
+    showError(container, msg);
+    setStatus(container, 'disconnected', 'Error');
     enableButtons(false);
   });
 
   // ── Vote buttons ──────────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.p-vote-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!conn?.open) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -199,11 +175,8 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   // ── Snapshot application ──────────────────────────────────────────────────
   function applySnapshot(snap: StateSnapshot) {
     // Toggle waiting / voting views
-    (container.querySelector<HTMLElement>('#waiting-view')!).style.display = snap.votingActive ? 'none' : '';
-    const votingView = container.querySelector<HTMLElement>('#voting-view')!;
-    votingView.style.display = snap.votingActive ? 'flex' : 'none';
-    votingView.style.flexDirection = 'column';
-    votingView.style.gap = '1.25rem';
+    container.querySelector('#waiting-view')!.classList.toggle('hidden', snap.votingActive);
+    container.querySelector('#voting-view')!.classList.toggle('hidden', !snap.votingActive);
 
     if (!snap.votingActive) return; // nothing else to update while waiting
 
@@ -225,22 +198,22 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     const downCount    = vs.filter(v => v === 'down').length;
     const hidden = snap.resultsHidden;
 
-    (container.querySelector('#p-tally-up')      as HTMLElement).textContent = hidden ? '?' : String(upCount);
-    (container.querySelector('#p-tally-neutral') as HTMLElement).textContent = hidden ? '?' : String(neutralCount);
-    (container.querySelector('#p-tally-down')    as HTMLElement).textContent = hidden ? '?' : String(downCount);
-    ['p-tally-up', 'p-tally-neutral', 'p-tally-down'].forEach(id =>
+    (container.querySelector('#tally-up')      as HTMLElement).textContent = hidden ? '?' : String(upCount);
+    (container.querySelector('#tally-neutral') as HTMLElement).textContent = hidden ? '?' : String(neutralCount);
+    (container.querySelector('#tally-down')    as HTMLElement).textContent = hidden ? '?' : String(downCount);
+    ['tally-up', 'tally-neutral', 'tally-down'].forEach(id =>
       container.querySelector(`#${id}`)?.classList.toggle('hidden-count', hidden)
     );
 
-    const pGrid = container.querySelector('#p-tally-grid')!;
-    ['p-tally-card-up', 'p-tally-card-neutral', 'p-tally-card-down'].forEach(id =>
+    const pGrid = container.querySelector('#tally-grid')!;
+    ['tally-card-up', 'tally-card-neutral', 'tally-card-down'].forEach(id =>
       container.querySelector(`#${id}`)?.classList.remove('winner')
     );
     const showWinner = snap.votingLocked && !hidden;
     pGrid.classList.toggle('has-winner', showWinner);
     if (showWinner) {
       const winner = getWinner(upCount, neutralCount, downCount);
-      container.querySelector(`#${winner === 'up' ? 'p-tally-card-up' : 'p-tally-card-down'}`)?.classList.add('winner');
+      container.querySelector(`#${winner === 'up' ? 'tally-card-up' : 'tally-card-down'}`)?.classList.add('winner');
     }
 
     // Locked state
@@ -266,10 +239,10 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     displayedTimerEndsAt = endsAt;
     clearTimer();
 
-    const timerBox = container.querySelector<HTMLElement>('#timer-box')!;
-    if (!endsAt) { timerBox.style.display = 'none'; return; }
+    const timerBox = container.querySelector('#timer-box')!;
+    if (!endsAt) { timerBox.classList.add('hidden'); return; }
 
-    timerBox.style.display = '';
+    timerBox.classList.remove('hidden');
     tick(endsAt);
     timerInterval = setInterval(() => tick(endsAt), 500);
   }
@@ -288,28 +261,16 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
   // ── Misc helpers ──────────────────────────────────────────────────────────
   function highlightVote(selected: VoteValue | null) {
-    container.querySelectorAll('.p-vote-btn').forEach((btn) =>
+    container.querySelectorAll('.vote-btn').forEach((btn) =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
-    container.querySelector('#p-tally-grid')?.classList.toggle('has-selection', selected !== null);
+    container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function enableButtons(enabled: boolean) {
-    container.querySelectorAll<HTMLButtonElement>('.p-vote-btn').forEach((btn) => {
+    container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
       btn.disabled = !enabled;
     });
-  }
-
-  function setStatus(cls: string, label: string) {
-    const el = container.querySelector('#conn-status')!;
-    el.className = `status-chip status-${cls}`;
-    el.innerHTML = `<span class="dot"></span>${label}`;
-  }
-
-  function showError(msg: string) {
-    const el = container.querySelector<HTMLElement>('#error-msg')!;
-    el.innerHTML = msg;
-    el.style.display = '';
   }
 
   return () => {
@@ -318,9 +279,3 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   };
 }
 
-function formatTime(ms: number): string {
-  const secs = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}

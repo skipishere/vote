@@ -2,7 +2,7 @@ import { generateRoomCode, getUserName, setUserName } from '../utils';
 
 export function renderHome(container: HTMLElement): () => void {
   container.innerHTML = `
-    <div class="page" style="justify-content:center;gap:1.5rem">
+    <div class="page page-centered">
       <div class="logo">☕ Lean Coffee Vote</div>
       <div class="card">
         <div class="form-group">
@@ -28,7 +28,7 @@ export function renderHome(container: HTMLElement): () => void {
           <button id="join-btn" class="btn btn-primary btn-full">Join meeting</button>
         </div>
 
-        <div id="error-msg" class="error-msg mt-sm" style="display:none"></div>
+        <div id="error-msg" class="error-msg mt-sm hidden"></div>
       </div>
     </div>
   `;
@@ -50,11 +50,11 @@ export function renderHome(container: HTMLElement): () => void {
 
   function showError(msg: string) {
     errorMsg.textContent = msg;
-    errorMsg.style.display = '';
+    errorMsg.classList.remove('hidden');
   }
 
   function clearError() {
-    errorMsg.style.display = 'none';
+    errorMsg.classList.add('hidden');
   }
 
   function getName(): string | null {

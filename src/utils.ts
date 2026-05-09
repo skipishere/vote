@@ -41,3 +41,8 @@ export function escHtml(text: string): string {
 export function getWinner(up: number, _neutral: number, down: number): 'up' | 'down' {
   return down >= up ? 'down' : 'up';
 }
+
+export function formatTime(ms: number): string {
+  const secs = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+}

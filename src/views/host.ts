@@ -1,6 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
-import { getUserName, copyText, escHtml, getWinner } from '../utils';
+import { getUserName, copyText, escHtml, getWinner, formatTime } from '../utils';
+import { tallyGridHtml, timerBoxHtml, setStatus, showError } from './shared';
 
 interface ParticipantEntry {
   name: string;
@@ -37,23 +38,23 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   // ── Render ────────────────────────────────────────────────────────────────
   container.innerHTML = `
     <div class="page">
-      <div style="width:100%;max-width:860px">
+      <div class="view-container">
 
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.625rem;margin-bottom:1rem">
+        <div class="view-header">
           <div class="logo">☕ Lean Coffee Vote</div>
-          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-            <span style="font-size:1.25rem;font-weight:700;letter-spacing:0.15em;font-family:ui-monospace,'Cascadia Code',monospace">${escHtml(roomCode)}</span>
+          <div class="view-header-actions">
+            <span class="room-code-badge">${escHtml(roomCode)}</span>
             <button id="copy-code-btn" class="btn btn-ghost btn-sm">Copy code</button>
             <button id="copy-link-btn" class="btn btn-ghost btn-sm">Copy link</button>
             <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Starting…</span>
-            <button id="lock-meeting-btn" class="btn btn-ghost btn-sm" style="width:6.5rem">🔒 Lock</button>
+            <button id="lock-meeting-btn" class="btn btn-ghost btn-sm">🔒 Lock</button>
             <button class="btn btn-danger btn-sm end-meeting-btn">End meeting</button>
           </div>
         </div>
 
-        <div id="error-msg" class="error-msg" style="display:none;margin-bottom:1rem"></div>
+        <div id="error-msg" class="error-msg hidden"></div>
 
-        <div id="topic-display" class="topic-box" style="display:none;margin-bottom:0.75rem">
+        <div id="topic-display" class="topic-box hidden">
           <span class="topic-placeholder">No topic set</span>
         </div>
 
@@ -65,12 +66,12 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
             <!-- SETUP PANEL -->
             <div id="setup-panel" class="panel">
               <div class="section-label">Topic</div>
-              <input id="topic-input" type="text" placeholder="What are we discussing? (optional)" maxlength="120" style="margin-bottom:1rem" />
+              <input id="topic-input" type="text" placeholder="What are we discussing? (optional)" maxlength="120" />
 
               <hr class="divider" />
 
               <div class="section-label">Timer</div>
-              <div class="timer-options" style="margin-bottom:1rem">
+              <div class="timer-options">
                 <button class="btn btn-ghost btn-sm btn-selected" data-preset="none">No timer</button>
                 <button class="btn btn-ghost btn-sm" data-preset="60">1m</button>
                 <button class="btn btn-ghost btn-sm" data-preset="120">2m</button>
@@ -82,7 +83,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
               <hr class="divider" />
 
               <div class="section-label">Results</div>
-              <div class="radio-group" style="margin-bottom:1rem">
+              <div class="radio-group">
                 <label class="radio-label">
                   <input type="radio" name="results-visibility" value="show" checked />
                   Show to participants
@@ -101,40 +102,21 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
             </div>
 
             <!-- ACTIVE PANEL -->
-            <div id="active-panel" style="display:none">
+            <div id="active-panel" class="hidden">
 
-              <div class="tally-grid" id="tally-grid" style="margin-bottom:0.375rem">
-                <button class="tally-card up host-vote-btn" id="tally-card-up" data-value="up">
-                  <div class="tally-icon">👍</div>
-                  <div class="tally-count" id="tally-up">0</div>
-                  <div class="tally-label">Continue</div>
-                </button>
-                <button class="tally-card neutral host-vote-btn" id="tally-card-neutral" data-value="sideways">
-                  <div class="tally-icon">👉</div>
-                  <div class="tally-count" id="tally-neutral">0</div>
-                  <div class="tally-label">Either way</div>
-                </button>
-                <button class="tally-card down host-vote-btn" id="tally-card-down" data-value="down">
-                  <div class="tally-icon">👎</div>
-                  <div class="tally-count" id="tally-down">0</div>
-                  <div class="tally-label">Move on</div>
-                </button>
-              </div>
-              <div id="voting-status" class="voting-status" style="margin-bottom:0.5rem"></div>
+              ${tallyGridHtml(false, '0')}
+              <div id="voting-status" class="voting-status"></div>
 
-              <div id="timer-running-box" class="timer-compact" style="display:none;margin-bottom:0.75rem">
-                <span class="timer-compact-label">⏱ Time remaining</span>
-                <span id="timer-countdown" class="timer-countdown">1:00</span>
-              </div>
+              ${timerBoxHtml('timer-running-box', 'timer-countdown')}
 
               <div class="controls-row">
                 <button id="end-vote-btn" class="btn btn-ghost">End vote</button>
-                <button id="new-round-btn" class="btn btn-ghost" style="display:none">↺ New round</button>
-                <button id="reset-timer-btn" class="btn btn-ghost" style="display:none">⏱ Reset timer</button>
+                <button id="new-round-btn" class="btn btn-ghost hidden">↺ New round</button>
+                <button id="reset-timer-btn" class="btn btn-ghost hidden">⏱ Reset timer</button>
               </div>
 
-              <div id="reset-timer-form" style="display:none;margin-top:0.625rem">
-                <div class="section-label" style="margin-bottom:0.5rem">Set timer duration</div>
+              <div id="reset-timer-form" class="hidden">
+                <div class="section-label">Set timer duration</div>
                 <div class="timer-options">
                   <button class="btn btn-ghost btn-sm btn-selected" data-reset-preset="60">1m</button>
                   <button class="btn btn-ghost btn-sm" data-reset-preset="120">2m</button>
@@ -158,7 +140,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
         </div>
       </div>
 
-      <div id="modal-backdrop" class="modal-backdrop" style="display:none">
+      <div id="modal-backdrop" class="modal-backdrop hidden">
         <div class="modal-card">
           <div class="modal-title" id="modal-title"></div>
           <div class="modal-body" id="modal-body"></div>
@@ -175,15 +157,15 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   // ── PeerJS ────────────────────────────────────────────────────────────────
   const peer = new Peer(peerId);
 
-  peer.on('open', () => setStatus('connected', 'Live'));
+  peer.on('open', () => setStatus(container, 'connected', 'Live'));
 
   peer.on('error', (err) => {
     if ((err as { type?: string }).type === 'unavailable-id') {
-      showError('This room code is already in use. Please go back and create a new meeting.');
+      showError(container, 'This room code is already in use. Please go back and create a new meeting.');
     } else {
-      showError(`Connection error: ${err.message}`);
+      showError(container, `Connection error: ${escHtml(err.message)}`);
     }
-    setStatus('disconnected', 'Error');
+    setStatus(container, 'disconnected', 'Error');
   });
 
   peer.on('connection', (conn) => {
@@ -264,9 +246,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     votingLocked  = false;
     roundId       = String(Date.now());
 
-    container.querySelector<HTMLElement>('#setup-panel')!.style.display   = 'none';
-    container.querySelector<HTMLElement>('#active-panel')!.style.display  = '';
-    container.querySelector<HTMLElement>('#topic-display')!.style.display = '';
+    container.querySelector('#setup-panel')!.classList.add('hidden');
+    container.querySelector('#active-panel')!.classList.remove('hidden');
+    container.querySelector('#topic-display')!.classList.remove('hidden');
 
     if (setupTimerSeconds !== null) startTimer(setupTimerSeconds);
 
@@ -292,9 +274,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     updateVoteButtons(null);
     updateLockUI();
 
-    container.querySelector<HTMLElement>('#setup-panel')!.style.display   = '';
-    container.querySelector<HTMLElement>('#active-panel')!.style.display  = 'none';
-    container.querySelector<HTMLElement>('#topic-display')!.style.display = 'none';
+    container.querySelector('#setup-panel')!.classList.remove('hidden');
+    container.querySelector('#active-panel')!.classList.add('hidden');
+    container.querySelector('#topic-display')!.classList.add('hidden');
 
     broadcast();
     refreshUI();
@@ -302,8 +284,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   // ── Active: Reset timer ───────────────────────────────────────────────────
   container.querySelector('#reset-timer-btn')!.addEventListener('click', () => {
-    const form = container.querySelector<HTMLElement>('#reset-timer-form')!;
-    form.style.display = form.style.display === 'none' ? '' : 'none';
+    container.querySelector('#reset-timer-form')!.classList.toggle('hidden');
   });
 
   container.querySelectorAll<HTMLButtonElement>('[data-reset-preset]').forEach((btn) => {
@@ -326,7 +307,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   container.querySelector('#reset-timer-confirm-btn')!.addEventListener('click', () => {
     votingLocked = false;
     startTimer(resetSecs);
-    container.querySelector<HTMLElement>('#reset-timer-form')!.style.display = 'none';
+    container.querySelector('#reset-timer-form')!.classList.add('hidden');
     updateLockUI();
     broadcast();
     refreshUI();
@@ -339,10 +320,10 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const confirmBtn = container.querySelector<HTMLButtonElement>('#modal-confirm-btn')!;
     confirmBtn.textContent = confirmLabel;
     const backdrop = container.querySelector<HTMLElement>('#modal-backdrop')!;
-    backdrop.style.display = '';
+    backdrop.classList.remove('hidden');
 
     const finish = (run: boolean) => {
-      backdrop.style.display = 'none';
+      backdrop.classList.add('hidden');
       confirmBtn.onclick = null;
       cancelBtn.onclick  = null;
       backdrop.onclick   = null;
@@ -392,7 +373,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   // ── Host vote buttons ─────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.host-vote-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (votingLocked) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -413,8 +394,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   function startTimer(seconds: number) {
     stopTimer();
     timerEndsAt = Date.now() + seconds * 1000;
-    const box = container.querySelector<HTMLElement>('#timer-running-box')!;
-    box.style.display = '';
+    const box = container.querySelector('#timer-running-box')!;
+    box.classList.remove('hidden');
 
     timerInterval = setInterval(() => {
       const remaining = timerEndsAt! - Date.now();
@@ -425,7 +406,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       if (remaining <= 0) {
         stopTimer();
         timerEndsAt = null;
-        box.style.display = 'none';
+        box.classList.add('hidden');
         endVote();
       }
     }, 500);
@@ -440,7 +421,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     resultsHidden = false;
     stopTimer();
     timerEndsAt = null;
-    container.querySelector<HTMLElement>('#timer-running-box')!.style.display = 'none';
+    container.querySelector('#timer-running-box')!.classList.add('hidden');
     updateLockUI();
     broadcast();
     refreshUI();
@@ -478,7 +459,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const list = container.querySelector('#participant-list')!;
     list.innerHTML = Array.from(participants.entries())
       .map(([id, p]) => {
-        const tag = id === 'host' ? ` <small style="color:var(--text-muted)">(you)</small>` : '';
+        const tag = id === 'host' ? ` <small class="participant-you">(you)</small>` : '';
         const badge = votingActive
           ? (votes.has(id)
               ? `<span class="voted-badge">✓ voted</span>`
@@ -518,23 +499,23 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   function updateVoteButtons(selected: VoteValue | null) {
-    container.querySelectorAll('.host-vote-btn').forEach(btn =>
+    container.querySelectorAll('.vote-btn').forEach(btn =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
     container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function updateLockUI() {
-    (container.querySelector<HTMLElement>('#end-vote-btn')!).style.display   = votingLocked ? 'none' : '';
-    (container.querySelector<HTMLElement>('#new-round-btn')!).style.display  = votingLocked ? '' : 'none';
-    (container.querySelector<HTMLElement>('#reset-timer-btn')!).style.display = votingLocked ? '' : 'none';
-    if (!votingLocked) (container.querySelector<HTMLElement>('#reset-timer-form')!).style.display = 'none';
+    container.querySelector('#end-vote-btn')!.classList.toggle('hidden', votingLocked);
+    container.querySelector('#new-round-btn')!.classList.toggle('hidden', !votingLocked);
+    container.querySelector('#reset-timer-btn')!.classList.toggle('hidden', !votingLocked);
+    if (!votingLocked) container.querySelector('#reset-timer-form')!.classList.add('hidden');
 
     const statusEl = container.querySelector<HTMLElement>('#voting-status')!;
     statusEl.textContent = votingLocked ? '🔒 Vote ended' : '';
     statusEl.className   = `voting-status${votingLocked ? ' locked' : ''}`;
 
-    container.querySelectorAll<HTMLButtonElement>('.host-vote-btn').forEach(btn => {
+    container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach(btn => {
       btn.disabled = votingLocked;
     });
 
@@ -572,24 +553,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     });
   }
 
-  function setStatus(cls: string, label: string) {
-    const el = container.querySelector('#conn-status')!;
-    el.className = `status-chip status-${cls}`;
-    el.innerHTML = `<span class="dot"></span>${label}`;
-  }
-
-  function showError(msg: string) {
-    const el = container.querySelector<HTMLElement>('#error-msg')!;
-    el.textContent = msg;
-    el.style.display = '';
-  }
-
   refreshUI();
 
   return () => { stopTimer(); peer.destroy(); };
-}
-
-function formatTime(ms: number): string {
-  const secs = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 }

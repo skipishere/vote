@@ -373,6 +373,59 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; 
 .mt-md  { margin-top: 1rem; }
 .mt-lg  { margin-top: 1.5rem; }
 .w-full { width: 100%; max-width: 560px; }
+.hidden { display: none; }
+
+/* ── Layout ── */
+.view-container { width: 100%; max-width: 860px; }
+.page-centered  { justify-content: center; gap: 1.5rem; }
+
+/* ── View header bar (host + participant) ── */
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Room code display variants ── */
+.room-code-badge {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+.code-mono { font-family: monospace; letter-spacing: 0.1em; }
+
+/* ── Participant you-indicator ── */
+.participant-you { color: var(--text-muted); }
+
+/* ── Participant voting view ── */
+#voting-view   { display: flex; flex-direction: column; gap: 1.5rem; }
+#voted-count   { text-align: center; }
+
+/* ── Host header spacing ── */
+.view-container > .view-header { margin-bottom: 1rem; }
+.view-container > #error-msg   { margin-bottom: 1rem; }
+#topic-display                 { margin-bottom: 0.75rem; }
+#lock-meeting-btn              { width: 6.5rem; }
+
+/* ── Host setup panel ── */
+#setup-panel input[type="text"] { margin-bottom: 1rem; }
+#setup-panel .timer-options     { margin-bottom: 1rem; }
+#setup-panel .radio-group       { margin-bottom: 1rem; }
+
+/* ── Host active panel ── */
+#active-panel #tally-grid { margin-bottom: 0.375rem; }
+#voting-status            { margin-bottom: 0.5rem; }
+#reset-timer-form         { margin-top: 0.625rem; }
+#reset-timer-form .section-label { margin-bottom: 0.5rem; }
 
 /* ── Host two-column grid ── */
 .host-grid {
