@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
-import { getClientId, getUserName, setUserName, escHtml, getWinner, formatTime } from '../utils';
-import { setStatus, showError } from './shared';
+import { getClientId, getUserName, setUserName, escHtml, getWinner } from '../utils';
+import { setStatus, showError, setVoteHighlight, tickTimerEl } from './shared';
 import nameGateHtml from './participant-gate.html?raw';
 import voteHtml from './participant-vote.html?raw';
 
@@ -90,7 +90,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
       if (snap.roundId !== currentRoundId) {
         currentRoundId = snap.roundId;
         currentVote = null;
-        highlightVote(null); // clear immediately — don't wait for reconciliation below
+        setVoteHighlight(container, null); // clear immediately — don't wait for reconciliation below
       }
 
       applySnapshot(snap);
@@ -131,7 +131,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
         currentVote = value;
         conn.send({ type: 'vote', value });
       }
-      highlightVote(currentVote);
+      setVoteHighlight(container, currentVote);
     });
   });
 
@@ -189,7 +189,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     const serverVote = (snap.votes[myClientId] as VoteValue | undefined) ?? null;
     if (serverVote !== currentVote) {
       currentVote = serverVote;
-      highlightVote(currentVote);
+      setVoteHighlight(container, currentVote);
     }
 
     // Timer
@@ -202,7 +202,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
     displayedTimerEndsAt = endsAt;
     clearTimer();
 
-    const timerBox = container.querySelector<HTMLElement>('#timer-box')!;
+    const timerBox = container.querySelector<HTMLElement>('#timer-running-box')!;
     if (!endsAt) { timerBox.hidden = true; return; }
 
     timerBox.hidden = false;
@@ -211,23 +211,12 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   }
 
   function tick(endsAt: number) {
-    const remaining = endsAt - Date.now();
-    const display = container.querySelector<HTMLElement>('#timer-display')!;
-    display.textContent = formatTime(remaining);
-    display.classList.toggle('urgent', remaining <= 10_000 && remaining > 0);
-    if (remaining <= 0) clearTimer();
+    const display = container.querySelector<HTMLElement>('#timer-countdown')!;
+    if (tickTimerEl(display, endsAt)) clearTimer();
   }
 
   function clearTimer() {
     if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
-  }
-
-  // ── Misc helpers ──────────────────────────────────────────────────────────
-  function highlightVote(selected: VoteValue | null) {
-    container.querySelectorAll('.tally-grid button').forEach((btn) =>
-      btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
-    );
-    container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function enableButtons(enabled: boolean) {

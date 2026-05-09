@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
-import { getUserName, copyText, escHtml, getWinner, formatTime } from '../utils';
-import { setStatus, showError } from './shared';
+import { getUserName, copyText, escHtml, getWinner } from '../utils';
+import { setStatus, showError, setVoteHighlight, tickTimerEl } from './shared';
 import hostHtml from './host.html?raw';
 
 interface ParticipantEntry {
@@ -157,7 +157,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     topicInput.value = '';
     stopTimer();
     timerEndsAt = null;
-    updateVoteButtons(null);
+    setVoteHighlight(container, null);
     updateLockUI();
 
     container.querySelector<HTMLElement>('#setup-panel')!.hidden = false;
@@ -269,7 +269,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
         hostVote = value;
         votes.set('host', value);
       }
-      updateVoteButtons(hostVote);
+      setVoteHighlight(container, hostVote);
       broadcast();
       refreshUI();
     });
@@ -283,12 +283,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     box.hidden = false;
 
     timerInterval = setInterval(() => {
-      const remaining = timerEndsAt! - Date.now();
       const el = container.querySelector<HTMLElement>('#timer-countdown')!;
-      el.textContent = formatTime(remaining);
-      el.classList.toggle('urgent', remaining <= 10_000 && remaining > 0);
-
-      if (remaining <= 0) {
+      if (tickTimerEl(el, timerEndsAt!)) {
         stopTimer();
         timerEndsAt = null;
         box.hidden = true;
@@ -381,13 +377,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     bannedClients.add(clientId);
     broadcast();
     refreshUI();
-  }
-
-  function updateVoteButtons(selected: VoteValue | null) {
-    container.querySelectorAll('.tally-grid button').forEach(btn =>
-      btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
-    );
-    container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function updateLockUI() {
