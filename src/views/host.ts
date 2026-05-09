@@ -373,7 +373,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   // ── Host vote buttons ─────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (votingLocked) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -499,7 +499,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   function updateVoteButtons(selected: VoteValue | null) {
-    container.querySelectorAll('.vote-btn').forEach(btn =>
+    container.querySelectorAll('.tally-btn').forEach(btn =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
     container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
@@ -515,7 +515,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     statusEl.textContent = votingLocked ? '🔒 Vote ended' : '';
     statusEl.className   = `voting-status${votingLocked ? ' locked' : ''}`;
 
-    container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach(btn => {
+    container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach(btn => {
       btn.disabled = votingLocked;
     });
 

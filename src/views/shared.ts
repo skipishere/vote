@@ -2,17 +2,17 @@ export function tallyGridHtml(disabled: boolean, initialCount: string): string {
   const dis = disabled ? ' disabled' : '';
   return `
               <div class="tally-grid" id="tally-grid">
-                <button class="tally-card up vote-btn" id="tally-card-up" data-value="up"${dis} accesskey="1">
+                <button class="tally-card up tally-btn" id="tally-card-up" data-value="up"${dis} accesskey="1">
                   <div class="tally-icon">👍</div>
                   <div class="tally-count" id="tally-up">${initialCount}</div>
                   <div class="tally-label">Continue</div>
                 </button>
-                <button class="tally-card neutral vote-btn" id="tally-card-neutral" data-value="sideways"${dis} accesskey="2">
+                <button class="tally-card neutral tally-btn" id="tally-card-neutral" data-value="sideways"${dis} accesskey="2">
                   <div class="tally-icon">✊</div>
                   <div class="tally-count" id="tally-neutral">${initialCount}</div>
                   <div class="tally-label">Either way</div>
                 </button>
-                <button class="tally-card down vote-btn" id="tally-card-down" data-value="down"${dis} accesskey="3">
+                <button class="tally-card down tally-btn" id="tally-card-down" data-value="down"${dis} accesskey="3">
                   <div class="tally-icon">👎</div>
                   <div class="tally-count" id="tally-down">${initialCount}</div>
                   <div class="tally-label">Move on</div>

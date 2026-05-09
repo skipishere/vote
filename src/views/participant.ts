@@ -157,7 +157,7 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
   });
 
   // ── Vote buttons ──────────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!conn?.open) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -261,14 +261,14 @@ function renderVoteUI(container: HTMLElement, roomCode: string, userName: string
 
   // ── Misc helpers ──────────────────────────────────────────────────────────
   function highlightVote(selected: VoteValue | null) {
-    container.querySelectorAll('.vote-btn').forEach((btn) =>
+    container.querySelectorAll('.tally-btn').forEach((btn) =>
       btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
     );
     container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
   }
 
   function enableButtons(enabled: boolean) {
-    container.querySelectorAll<HTMLButtonElement>('.vote-btn').forEach((btn) => {
+    container.querySelectorAll<HTMLButtonElement>('.tally-btn').forEach((btn) => {
       btn.disabled = !enabled;
     });
   }
