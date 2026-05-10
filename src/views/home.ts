@@ -30,7 +30,11 @@ export function renderHome(container: HTMLElement): () => void {
 
   function getName(): string | null {
     const n = nameInput.value.trim();
-    if (!n) { showError('Please enter your name.'); nameInput.focus(); return null; }
+    if (!n) {
+      showError('Please enter your name.');
+      nameInput.focus();
+      return null;
+    }
     return n;
   }
 
@@ -62,7 +66,11 @@ export function renderHome(container: HTMLElement): () => void {
     const name = getName();
     if (!name) return;
     const code = codeInput.value.trim().toUpperCase();
-    if (!code) { showError('Please enter the room code.'); codeInput.focus(); return; }
+    if (!code) { 
+      showError('Please enter the room code.');
+      codeInput.focus();
+      return; 
+    }
     setUserName(name);
     window.location.hash = `/join/${code}`;
   });

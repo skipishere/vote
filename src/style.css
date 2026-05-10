@@ -180,10 +180,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .tabs button.active { background: var(--surface); color: var(--text); }
 
-.tab-panel        { display: none; }
-.tab-panel.active { display: block; }
+.tab-panels {
+  display: grid;
+}
+.tab-panel {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  visibility: hidden;
+  pointer-events: none;
+}
+.tab-panel.active {
+  visibility: visible;
+  pointer-events: auto;
+}
 
-/* ── Error / status messages ── */
 .error-msg {
   padding: 0.625rem 0.875rem;
   background: var(--danger-surface);
@@ -193,6 +205,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 0.875rem;
 }
 .error-msg a { color: inherit; }
+#error-msg[hidden] { display: block; visibility: hidden; }
+#error-msg { min-height: calc(1.5em + 1.25rem); }
 
 .status-chip {
   display: inline-flex;
@@ -206,16 +220,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .status-connected    { background: var(--success-bg); color: var(--success); }
 .status-connecting   { background: var(--warning-bg); color: var(--warning); }
 .status-disconnected { background: var(--danger-bg);  color: var(--danger); }
-.status-chip span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.status-chip::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-/* ── Vote tally cards ── */
-.tally-grid {
+/* ── Ballot ── */
+.ballot {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.75rem;
   width: 100%;
 }
-.tally-card {
+.ballot-option {
   background: var(--surface);
   border: 2px solid var(--border);
   border-radius: var(--radius);
@@ -229,39 +243,39 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   cursor: pointer;
   width: 100%;
 }
-.tally-card:hover:not(:disabled):not(.winner) { transform: scale(1.03); opacity: 0.9; }
-.tally-card:active:not(:disabled) { transform: scale(0.97); }
-.tally-card:disabled { cursor: default; }
+.ballot-option:hover:not(:disabled):not(.winner) { transform: scale(1.03); opacity: 0.9; }
+.ballot-option:active:not(:disabled) { transform: scale(0.97); }
+.ballot-option:disabled { cursor: default; }
 
-.tally-card.up      { border-color: var(--up); }
-.tally-card.down    { border-color: var(--down); }
-.tally-card.neutral { border-color: var(--neutral); }
+.ballot-option.up      { border-color: var(--up); }
+.ballot-option.down    { border-color: var(--down); }
+.ballot-option.neutral { border-color: var(--neutral); }
 
-.tally-card.up.selected      { background: var(--up-bg); }
-.tally-card.down.selected    { background: var(--down-bg); }
-.tally-card.neutral.selected { background: var(--neutral-bg); }
+.ballot-option.up.selected      { background: var(--up-bg); }
+.ballot-option.down.selected    { background: var(--down-bg); }
+.ballot-option.neutral.selected { background: var(--neutral-bg); }
 
-.tally-card.winner {
+.ballot-option.winner {
   transform: scale(1.08);
   z-index: 1;
   opacity: 1;
   transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease-out, background 0.35s, border-color 0.3s, opacity 0.3s;
 }
-.tally-card.up.winner {
+.ballot-option.up.winner {
   background: var(--up-bg);
   box-shadow: 0 0 0 2px var(--up), 0 6px 24px var(--up-glow);
 }
-.tally-card.down.winner {
+.ballot-option.down.winner {
   background: var(--down-bg);
   box-shadow: 0 0 0 2px var(--down), 0 6px 24px var(--down-glow);
 }
-.tally-grid.has-winner .tally-card:not(.winner) {
+.ballot.has-winner .ballot-option:not(.winner) {
   opacity: 0.4;
   transform: scale(0.96);
   transition: transform 0.4s ease-out, opacity 0.4s ease-out, box-shadow 0.3s;
 }
-.tally-grid.has-winner .tally-card.selected:not(.winner) { opacity: 0.8; }
-.tally-grid.has-winner .tally-card.selected::after {
+.ballot.has-winner .ballot-option.selected:not(.winner) { opacity: 0.8; }
+.ballot.has-winner .ballot-option.selected::after {
   content: 'Your vote';
   display: block;
   font-size: 0.625rem;
@@ -271,15 +285,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--text-muted);
   margin-top: 0.375rem;
 }
-.tally-grid.has-selection .tally-card:not(.selected):not(:disabled) { opacity: 0.35; }
+.ballot.has-selection .ballot-option:not(.selected):not(:disabled) { opacity: 0.35; }
 
-.tally-icon  { font-size: 1.625rem; }
-.tally-count { font-size: 2.75rem; font-weight: 700; line-height: 1.1; }
-.tally-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.125rem; }
-.tally-card.up      .tally-count { color: var(--up); }
-.tally-card.down    .tally-count { color: var(--down); }
-.tally-card.neutral .tally-count { color: var(--neutral); }
-.hidden-count { opacity: 0.3; }
+.ballot-option > div:first-child  { font-size: 1.625rem; }
+.ballot-option > div:nth-child(2) { font-size: 2.75rem; font-weight: 700; line-height: 1.1; }
+.ballot-option > div:last-child   { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.125rem; }
+.ballot-option.up      > div:nth-child(2) { color: var(--up); }
+.ballot-option.down    > div:nth-child(2) { color: var(--down); }
+.ballot-option.neutral > div:nth-child(2) { color: var(--neutral); }
+.ballot.results-hidden > .ballot-option > div:nth-child(2) { opacity: 0.3; }
 
 /* ── Panels ── */
 .panel {
@@ -377,7 +391,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 #setup-panel :is(input[type="text"], .timer-options, .radio-group) { margin-bottom: 1rem; }
 
 /* ── Host active panel ── */
-#active-panel #tally-grid        { margin-bottom: 0.375rem; }
+#active-panel #ballot             { margin-bottom: 0.375rem; }
 #voting-status                   { margin-bottom: 0.5rem; }
 #reset-timer-form                { margin-top: 0.625rem; }
 #reset-timer-form .section-label { margin-bottom: 0.5rem; }
@@ -438,7 +452,7 @@ button.btn-selected {
 
 /* ── Timer ── */
 .timer-options span { font-size: 0.875rem; color: var(--text-muted); }
-.timer-countdown {
+.timer-compact span:last-child {
   font-size: 1.25rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -446,7 +460,7 @@ button.btn-selected {
   min-width: 2.75rem;
   text-align: right;
 }
-.timer-countdown.urgent { color: var(--down); }
+.timer-compact span:last-child.urgent { color: var(--down); }
 .timer-compact:not([hidden]) {
   display: flex;
   align-items: center;
@@ -456,7 +470,6 @@ button.btn-selected {
 }
 .timer-compact span:first-child { font-size: 0.8125rem; color: var(--text-muted); }
 
-/* ── Modal ── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -481,7 +494,6 @@ button.btn-selected {
 #modal-body  { font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 
-/* ── Responsive ── */
 @media (max-width: 440px) {
-  .tally-count { font-size: 2.25rem; }
+  .ballot-option > div:nth-child(2) { font-size: 2.25rem; }
 }

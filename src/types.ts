@@ -1,4 +1,4 @@
-export type VoteValue = 'up' | 'down' | 'sideways';
+export type VoteValue = 'up' | 'down' | 'neutral';
 
 /** Broadcast from host to all participants after every state change. */
 export interface StateSnapshot {
@@ -10,6 +10,9 @@ export interface StateSnapshot {
   votingActive: boolean;
   resultsHidden: boolean;
   votingLocked: boolean;
+  winner: 'up' | 'down';
+  counts: { up: number; neutral: number; down: number };
+  votedCount: number;
   timerEndsAt: number | null;           // ms epoch when timer expires, null if no timer
 }
 
