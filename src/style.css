@@ -180,10 +180,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .tabs button.active { background: var(--surface); color: var(--text); }
 
-.tab-panel        { display: none; }
-.tab-panel.active { display: block; }
+.tab-panels {
+  display: grid;
+}
+.tab-panel {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  visibility: hidden;
+  pointer-events: none;
+}
+.tab-panel.active {
+  visibility: visible;
+  pointer-events: auto;
+}
 
-/* ── Error / status messages ── */
 .error-msg {
   padding: 0.625rem 0.875rem;
   background: var(--danger-surface);
@@ -193,6 +205,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 0.875rem;
 }
 .error-msg a { color: inherit; }
+#error-msg[hidden] { display: block; visibility: hidden; }
+#error-msg { min-height: calc(1.5em + 1.25rem); }
 
 .status-chip {
   display: inline-flex;
@@ -456,7 +470,6 @@ button.btn-selected {
 }
 .timer-compact span:first-child { font-size: 0.8125rem; color: var(--text-muted); }
 
-/* ── Modal ── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -481,7 +494,6 @@ button.btn-selected {
 #modal-body  { font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 
-/* ── Responsive ── */
 @media (max-width: 440px) {
   .ballot-option > div:nth-child(2) { font-size: 2.25rem; }
 }
