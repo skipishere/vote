@@ -1,0 +1,29 @@
+<div class="page page-centered">
+  <div class="logo">☕ Lean Coffee Vote</div>
+  <div class="card">
+    <div class="form-group">
+      <label for="name-input">Your name</label>
+      <input id="name-input" type="text" placeholder="e.g. Alex" maxlength="40" autocomplete="nickname" />
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="create">Host a meeting</button>
+      <button data-tab="join">Join a meeting</button>
+    </div>
+
+    <div id="panel-create" class="tab-panel active">
+      <button id="create-btn" class="btn-primary btn-full">Create meeting</button>
+    </div>
+
+    <div id="panel-join" class="tab-panel">
+      <div class="form-group">
+        <label for="code-input">Room code</label>
+        <input id="code-input" type="text" placeholder="e.g. ABC123" maxlength="6"
+          autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
+      </div>
+      <button id="join-btn" class="btn-primary btn-full">Join meeting</button>
+    </div>
+
+    <div id="error-msg" class="error-msg mt-sm" hidden></div>
+  </div>
+</div>

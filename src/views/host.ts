@@ -1,6 +1,8 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
 import { getUserName, copyText, escHtml, getWinner } from '../utils';
+import { setStatus, showError, setVoteHighlight, tickTimerEl } from './shared';
+import hostHtml from './host.html?raw';
 
 interface ParticipantEntry {
   name: string;
@@ -35,155 +37,21 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   participants.set('host', { name: hostName, conn: null });
 
   // ── Render ────────────────────────────────────────────────────────────────
-  container.innerHTML = `
-    <div class="page">
-      <div style="width:100%;max-width:860px">
-
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.625rem;margin-bottom:1rem">
-          <div class="logo">☕ Lean Coffee Vote</div>
-          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-            <span style="font-size:1.25rem;font-weight:700;letter-spacing:0.15em;font-family:ui-monospace,'Cascadia Code',monospace">${escHtml(roomCode)}</span>
-            <button id="copy-code-btn" class="btn btn-ghost btn-sm">Copy code</button>
-            <button id="copy-link-btn" class="btn btn-ghost btn-sm">Copy link</button>
-            <span id="conn-status" class="status-chip status-connecting"><span class="dot"></span>Starting…</span>
-            <button id="lock-meeting-btn" class="btn btn-ghost btn-sm" style="width:6.5rem">🔒 Lock</button>
-            <button class="btn btn-danger btn-sm end-meeting-btn">End meeting</button>
-          </div>
-        </div>
-
-        <div id="error-msg" class="error-msg" style="display:none;margin-bottom:1rem"></div>
-
-        <div id="topic-display" class="topic-box" style="display:none;margin-bottom:0.75rem">
-          <span class="topic-placeholder">No topic set</span>
-        </div>
-
-        <div class="host-grid">
-
-          <!-- Left: phase-dependent content -->
-          <div>
-
-            <!-- SETUP PANEL -->
-            <div id="setup-panel" class="panel">
-              <div class="section-label">Topic</div>
-              <input id="topic-input" type="text" placeholder="What are we discussing? (optional)" maxlength="120" style="margin-bottom:1rem" />
-
-              <hr class="divider" />
-
-              <div class="section-label">Timer</div>
-              <div class="timer-options" style="margin-bottom:1rem">
-                <button class="btn btn-ghost btn-sm btn-selected" data-preset="none">No timer</button>
-                <button class="btn btn-ghost btn-sm" data-preset="60">1m</button>
-                <button class="btn btn-ghost btn-sm" data-preset="120">2m</button>
-                <button class="btn btn-ghost btn-sm" data-preset="300">5m</button>
-                <input id="timer-custom" type="number" min="5" max="600" placeholder="Custom" />
-                <span class="timer-unit">sec</span>
-              </div>
-
-              <hr class="divider" />
-
-              <div class="section-label">Results</div>
-              <div class="radio-group" style="margin-bottom:1rem">
-                <label class="radio-label">
-                  <input type="radio" name="results-visibility" value="show" checked />
-                  Show to participants
-                </label>
-                <label class="radio-label">
-                  <input type="radio" name="results-visibility" value="hide" />
-                  Hide until vote ends
-                </label>
-              </div>
-
-              <hr class="divider" />
-
-              <div class="controls-row">
-                <button id="start-btn" class="btn btn-primary">▶ Start vote</button>
-              </div>
-            </div>
-
-            <!-- ACTIVE PANEL -->
-            <div id="active-panel" style="display:none">
-
-              <div class="tally-grid" id="tally-grid" style="margin-bottom:0.375rem">
-                <button class="tally-card up host-vote-btn" id="tally-card-up" data-value="up">
-                  <div class="tally-icon">👍</div>
-                  <div class="tally-count" id="tally-up">0</div>
-                  <div class="tally-label">Continue</div>
-                </button>
-                <button class="tally-card neutral host-vote-btn" id="tally-card-neutral" data-value="sideways">
-                  <div class="tally-icon">👉</div>
-                  <div class="tally-count" id="tally-neutral">0</div>
-                  <div class="tally-label">Either way</div>
-                </button>
-                <button class="tally-card down host-vote-btn" id="tally-card-down" data-value="down">
-                  <div class="tally-icon">👎</div>
-                  <div class="tally-count" id="tally-down">0</div>
-                  <div class="tally-label">Move on</div>
-                </button>
-              </div>
-              <div id="voting-status" class="voting-status" style="margin-bottom:0.5rem"></div>
-
-              <div id="timer-running-box" class="timer-compact" style="display:none;margin-bottom:0.75rem">
-                <span class="timer-compact-label">⏱ Time remaining</span>
-                <span id="timer-countdown" class="timer-countdown">1:00</span>
-              </div>
-
-              <div class="controls-row">
-                <button id="end-vote-btn" class="btn btn-ghost">End vote</button>
-                <button id="new-round-btn" class="btn btn-ghost" style="display:none">↺ New round</button>
-                <button id="reset-timer-btn" class="btn btn-ghost" style="display:none">⏱ Reset timer</button>
-              </div>
-
-              <div id="reset-timer-form" style="display:none;margin-top:0.625rem">
-                <div class="section-label" style="margin-bottom:0.5rem">Set timer duration</div>
-                <div class="timer-options">
-                  <button class="btn btn-ghost btn-sm btn-selected" data-reset-preset="60">1m</button>
-                  <button class="btn btn-ghost btn-sm" data-reset-preset="120">2m</button>
-                  <button class="btn btn-ghost btn-sm" data-reset-preset="300">5m</button>
-                  <input id="reset-timer-custom" type="number" min="5" max="600" placeholder="Custom" />
-                  <span class="timer-unit">sec</span>
-                  <button id="reset-timer-confirm-btn" class="btn btn-primary btn-sm">▶ Go</button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- Right: participants (always visible) -->
-          <div class="panel">
-            <div class="section-label">Participants</div>
-            <div id="voted-summary" class="voted-summary"></div>
-            <ul id="participant-list" class="participant-list"></ul>
-          </div>
-
-        </div>
-      </div>
-
-      <div id="modal-backdrop" class="modal-backdrop" style="display:none">
-        <div class="modal-card">
-          <div class="modal-title" id="modal-title"></div>
-          <div class="modal-body" id="modal-body"></div>
-          <div class="modal-actions">
-            <button id="modal-cancel-btn" class="btn btn-ghost">Cancel</button>
-            <button id="modal-confirm-btn" class="btn btn-danger">Confirm</button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  `;
+  container.innerHTML = hostHtml;
+  container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
   // ── PeerJS ────────────────────────────────────────────────────────────────
   const peer = new Peer(peerId);
 
-  peer.on('open', () => setStatus('connected', 'Live'));
+  peer.on('open', () => setStatus(container, 'connected', 'Live'));
 
   peer.on('error', (err) => {
     if ((err as { type?: string }).type === 'unavailable-id') {
-      showError('This room code is already in use. Please go back and create a new meeting.');
+      showError(container, 'This room code is already in use. Please go back and create a new meeting.');
     } else {
-      showError(`Connection error: ${err.message}`);
+      showError(container, `Connection error: ${escHtml(err.message)}`);
     }
-    setStatus('disconnected', 'Error');
+    setStatus(container, 'disconnected', 'Error');
   });
 
   peer.on('connection', (conn) => {
@@ -264,9 +132,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     votingLocked  = false;
     roundId       = String(Date.now());
 
-    container.querySelector<HTMLElement>('#setup-panel')!.style.display   = 'none';
-    container.querySelector<HTMLElement>('#active-panel')!.style.display  = '';
-    container.querySelector<HTMLElement>('#topic-display')!.style.display = '';
+    container.querySelector<HTMLElement>('#setup-panel')!.hidden = true;
+    container.querySelector<HTMLElement>('#active-panel')!.hidden = false;
+    container.querySelector<HTMLElement>('#topic-display')!.hidden = false;
 
     if (setupTimerSeconds !== null) startTimer(setupTimerSeconds);
 
@@ -289,12 +157,12 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     topicInput.value = '';
     stopTimer();
     timerEndsAt = null;
-    updateVoteButtons(null);
+    setVoteHighlight(container, null);
     updateLockUI();
 
-    container.querySelector<HTMLElement>('#setup-panel')!.style.display   = '';
-    container.querySelector<HTMLElement>('#active-panel')!.style.display  = 'none';
-    container.querySelector<HTMLElement>('#topic-display')!.style.display = 'none';
+    container.querySelector<HTMLElement>('#setup-panel')!.hidden = false;
+    container.querySelector<HTMLElement>('#active-panel')!.hidden = true;
+    container.querySelector<HTMLElement>('#topic-display')!.hidden = true;
 
     broadcast();
     refreshUI();
@@ -303,7 +171,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   // ── Active: Reset timer ───────────────────────────────────────────────────
   container.querySelector('#reset-timer-btn')!.addEventListener('click', () => {
     const form = container.querySelector<HTMLElement>('#reset-timer-form')!;
-    form.style.display = form.style.display === 'none' ? '' : 'none';
+    form.hidden = !form.hidden;
   });
 
   container.querySelectorAll<HTMLButtonElement>('[data-reset-preset]').forEach((btn) => {
@@ -326,7 +194,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   container.querySelector('#reset-timer-confirm-btn')!.addEventListener('click', () => {
     votingLocked = false;
     startTimer(resetSecs);
-    container.querySelector<HTMLElement>('#reset-timer-form')!.style.display = 'none';
+    container.querySelector<HTMLElement>('#reset-timer-form')!.hidden = true;
     updateLockUI();
     broadcast();
     refreshUI();
@@ -339,10 +207,10 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const confirmBtn = container.querySelector<HTMLButtonElement>('#modal-confirm-btn')!;
     confirmBtn.textContent = confirmLabel;
     const backdrop = container.querySelector<HTMLElement>('#modal-backdrop')!;
-    backdrop.style.display = '';
+    backdrop.hidden = false;
 
     const finish = (run: boolean) => {
-      backdrop.style.display = 'none';
+      backdrop.hidden = true;
       confirmBtn.onclick = null;
       cancelBtn.onclick  = null;
       backdrop.onclick   = null;
@@ -354,13 +222,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     backdrop.onclick   = (e) => { if (e.target === backdrop) finish(false); };
   }
 
-  // ── End meeting (both panels) ─────────────────────────────────────────────
-  container.querySelectorAll('.end-meeting-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
-        peer.destroy();
-        window.location.hash = '/';
-      });
+  // ── End meeting ───────────────────────────────────────────────────────────
+  container.querySelector('#end-meeting-btn')!.addEventListener('click', () => {
+    showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
+      peer.destroy();
+      window.location.hash = '/';
     });
   });
 
@@ -392,7 +258,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   }
 
   // ── Host vote buttons ─────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.host-vote-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (votingLocked) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -403,7 +269,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
         hostVote = value;
         votes.set('host', value);
       }
-      updateVoteButtons(hostVote);
+      setVoteHighlight(container, hostVote);
       broadcast();
       refreshUI();
     });
@@ -414,18 +280,14 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     stopTimer();
     timerEndsAt = Date.now() + seconds * 1000;
     const box = container.querySelector<HTMLElement>('#timer-running-box')!;
-    box.style.display = '';
+    box.hidden = false;
 
     timerInterval = setInterval(() => {
-      const remaining = timerEndsAt! - Date.now();
       const el = container.querySelector<HTMLElement>('#timer-countdown')!;
-      el.textContent = formatTime(remaining);
-      el.classList.toggle('urgent', remaining <= 10_000 && remaining > 0);
-
-      if (remaining <= 0) {
+      if (tickTimerEl(el, timerEndsAt!)) {
         stopTimer();
         timerEndsAt = null;
-        box.style.display = 'none';
+        box.hidden = true;
         endVote();
       }
     }, 500);
@@ -440,7 +302,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     resultsHidden = false;
     stopTimer();
     timerEndsAt = null;
-    container.querySelector<HTMLElement>('#timer-running-box')!.style.display = 'none';
+    container.querySelector<HTMLElement>('#timer-running-box')!.hidden = true;
     updateLockUI();
     broadcast();
     refreshUI();
@@ -478,20 +340,20 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const list = container.querySelector('#participant-list')!;
     list.innerHTML = Array.from(participants.entries())
       .map(([id, p]) => {
-        const tag = id === 'host' ? ` <small style="color:var(--text-muted)">(you)</small>` : '';
+        const tag = id === 'host' ? ` <small>(you)</small>` : '';
         const badge = votingActive
           ? (votes.has(id)
               ? `<span class="voted-badge">✓ voted</span>`
               : `<span class="waiting-badge">waiting…</span>`)
           : '';
         const kickBtn = id !== 'host'
-          ? `<button class="kick-btn" data-cid="${escHtml(id)}" title="Remove from meeting">✕</button>`
+          ? `<button data-cid="${escHtml(id)}" title="Remove from meeting">✕</button>`
           : '';
-        return `<li class="participant-item"><span>${escHtml(p.name)}${tag}</span><span>${badge}</span><span>${kickBtn}</span></li>`;
+        return `<li><span>${escHtml(p.name)}${tag}</span><span>${badge}</span><span>${kickBtn}</span></li>`;
       })
       .join('');
 
-    list.querySelectorAll<HTMLButtonElement>('.kick-btn').forEach((btn) => {
+    list.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         const cid  = btn.getAttribute('data-cid')!;
         const name = participants.get(cid)?.name ?? 'this participant';
@@ -517,24 +379,17 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   }
 
-  function updateVoteButtons(selected: VoteValue | null) {
-    container.querySelectorAll('.host-vote-btn').forEach(btn =>
-      btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
-    );
-    container.querySelector('#tally-grid')?.classList.toggle('has-selection', selected !== null);
-  }
-
   function updateLockUI() {
-    (container.querySelector<HTMLElement>('#end-vote-btn')!).style.display   = votingLocked ? 'none' : '';
-    (container.querySelector<HTMLElement>('#new-round-btn')!).style.display  = votingLocked ? '' : 'none';
-    (container.querySelector<HTMLElement>('#reset-timer-btn')!).style.display = votingLocked ? '' : 'none';
-    if (!votingLocked) (container.querySelector<HTMLElement>('#reset-timer-form')!).style.display = 'none';
+    container.querySelector<HTMLElement>('#end-vote-btn')!.hidden = votingLocked;
+    container.querySelector<HTMLElement>('#new-round-btn')!.hidden = !votingLocked;
+    container.querySelector<HTMLElement>('#reset-timer-btn')!.hidden = !votingLocked;
+    if (!votingLocked) container.querySelector<HTMLElement>('#reset-timer-form')!.hidden = true;
 
     const statusEl = container.querySelector<HTMLElement>('#voting-status')!;
     statusEl.textContent = votingLocked ? '🔒 Vote ended' : '';
     statusEl.className   = `voting-status${votingLocked ? ' locked' : ''}`;
 
-    container.querySelectorAll<HTMLButtonElement>('.host-vote-btn').forEach(btn => {
+    container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach(btn => {
       btn.disabled = votingLocked;
     });
 
@@ -572,24 +427,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     });
   }
 
-  function setStatus(cls: string, label: string) {
-    const el = container.querySelector('#conn-status')!;
-    el.className = `status-chip status-${cls}`;
-    el.innerHTML = `<span class="dot"></span>${label}`;
-  }
-
-  function showError(msg: string) {
-    const el = container.querySelector<HTMLElement>('#error-msg')!;
-    el.textContent = msg;
-    el.style.display = '';
-  }
-
   refreshUI();
 
   return () => { stopTimer(); peer.destroy(); };
-}
-
-function formatTime(ms: number): string {
-  const secs = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 }
