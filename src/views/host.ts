@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
-import { getUserName, copyText, escHtml, getWinner } from '../utils';
-import { setStatus, showError, setVoteHighlight, tickTimerEl } from './shared';
+import { getUserName, copyText, escHtml } from '../utils';
+import { setStatus, showError, setVoteHighlight, tickTimerEl, ballotHtml, timerHtml, applyWinnerHighlight } from './shared';
 import hostHtml from './host.html?raw';
 
 interface ParticipantEntry {
@@ -16,7 +16,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   const peerId  = 'lcv-' + roomCode.toLowerCase();
   const joinUrl = `${location.origin}${location.pathname}#/join/${roomCode}`;
 
-  // ── State ─────────────────────────────────────────────────────────────────
   const participants = new Map<string, ParticipantEntry>();
   const peerToClient = new Map<string, string>();
   const votes        = new Map<string, VoteValue>();
@@ -36,11 +35,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   participants.set('host', { name: hostName, conn: null });
 
-  // ── Render ────────────────────────────────────────────────────────────────
   container.innerHTML = hostHtml;
+  container.querySelector('#ballot-slot')!.outerHTML = ballotHtml;
+  container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
-  // ── PeerJS ────────────────────────────────────────────────────────────────
   const peer = new Peer(peerId);
 
   peer.on('open', () => setStatus(container, 'connected', 'Live'));
@@ -102,7 +101,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     });
   });
 
-  // ── Setup: timer presets ──────────────────────────────────────────────────
   const topicInput    = container.querySelector<HTMLInputElement>('#topic-input')!;
   const customTimer   = container.querySelector<HTMLInputElement>('#timer-custom')!;
 
@@ -124,7 +122,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     }
   });
 
-  // ── Setup: Start vote ─────────────────────────────────────────────────────
   container.querySelector('#start-btn')!.addEventListener('click', () => {
     topic         = topicInput.value.trim();
     resultsHidden = container.querySelector<HTMLInputElement>('input[name="results-visibility"]:checked')?.value === 'hide';
@@ -142,12 +139,10 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   });
 
-  // ── Active: End vote ──────────────────────────────────────────────────────
   container.querySelector('#end-vote-btn')!.addEventListener('click', () => {
     endVote();
   });
 
-  // ── Active: New round ─────────────────────────────────────────────────────
   container.querySelector('#new-round-btn')!.addEventListener('click', () => {
     votes.clear();
     hostVote     = null;
@@ -168,7 +163,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   });
 
-  // ── Active: Reset timer ───────────────────────────────────────────────────
   container.querySelector('#reset-timer-btn')!.addEventListener('click', () => {
     const form = container.querySelector<HTMLElement>('#reset-timer-form')!;
     form.hidden = !form.hidden;
@@ -200,7 +194,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   });
 
-  // ── Modal ─────────────────────────────────────────────────────────────────
   function showModal(title: string, body: string, confirmLabel: string, onConfirm: () => void) {
     (container.querySelector('#modal-title') as HTMLElement).textContent = title;
     (container.querySelector('#modal-body')  as HTMLElement).textContent = body;
@@ -222,7 +215,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     backdrop.onclick   = (e) => { if (e.target === backdrop) finish(false); };
   }
 
-  // ── End meeting ───────────────────────────────────────────────────────────
   container.querySelector('#end-meeting-btn')!.addEventListener('click', () => {
     showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
       peer.destroy();
@@ -230,7 +222,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     });
   });
 
-  // ── Copy buttons ──────────────────────────────────────────────────────────
   container.querySelector('#copy-code-btn')!.addEventListener('click', async () => {
     const btn = container.querySelector<HTMLButtonElement>('#copy-code-btn')!;
     await copyText(roomCode);
@@ -245,7 +236,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     setTimeout(() => (btn.textContent = 'Copy link'), 2000);
   });
 
-  // ── Lock meeting ──────────────────────────────────────────────────────────
   container.querySelector('#lock-meeting-btn')!.addEventListener('click', () => {
     meetingLocked = !meetingLocked;
     updateLockMeetingBtn();
@@ -257,8 +247,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     btn.classList.toggle('btn-selected', meetingLocked);
   }
 
-  // ── Host vote buttons ─────────────────────────────────────────────────────
-  container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.ballot button').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (votingLocked) return;
       const value = btn.getAttribute('data-value') as VoteValue;
@@ -275,19 +264,17 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     });
   });
 
-  // ── Timer ─────────────────────────────────────────────────────────────────
   function startTimer(seconds: number) {
     stopTimer();
     timerEndsAt = Date.now() + seconds * 1000;
-    const box = container.querySelector<HTMLElement>('#timer-running-box')!;
+    const box     = container.querySelector<HTMLElement>('#timer-running-box')!;
+    const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
     box.hidden = false;
-
     timerInterval = setInterval(() => {
-      const el = container.querySelector<HTMLElement>('#timer-countdown')!;
-      if (tickTimerEl(el, timerEndsAt!)) {
+      if (tickTimerEl(display, timerEndsAt!)) {
         stopTimer();
-        timerEndsAt = null;
         box.hidden = true;
+        timerEndsAt = null;
         endVote();
       }
     }, 500);
@@ -299,7 +286,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   function endVote() {
     votingLocked  = true;
-    resultsHidden = false;
     stopTimer();
     timerEndsAt = null;
     container.querySelector<HTMLElement>('#timer-running-box')!.hidden = true;
@@ -308,7 +294,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   }
 
-  // ── UI helpers ────────────────────────────────────────────────────────────
   function refreshUI() {
     if (votingActive) {
       // Topic
@@ -318,15 +303,10 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
         : `<span class="topic-placeholder">No topic set</span>`;
 
       // Tallies
-      let up = 0, down = 0, neutral = 0;
-      votes.forEach(v => {
-        if (v === 'up') up++;
-        else if (v === 'down') down++;
-        else if (v === 'sideways') neutral++;
-      });
-      (container.querySelector('#tally-up')      as HTMLElement).textContent = String(up);
-      (container.querySelector('#tally-neutral') as HTMLElement).textContent = String(neutral);
-      (container.querySelector('#tally-down')    as HTMLElement).textContent = String(down);
+      const { counts } = snapshot();
+      (container.querySelector('#count-up')      as HTMLElement).textContent = String(counts.up);
+      (container.querySelector('#count-neutral') as HTMLElement).textContent = String(counts.neutral);
+      (container.querySelector('#count-down')    as HTMLElement).textContent = String(counts.down);
 
       // Voted summary
       (container.querySelector('#voted-summary') as HTMLElement).textContent =
@@ -389,21 +369,12 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     statusEl.textContent = votingLocked ? '🔒 Vote ended' : '';
     statusEl.className   = `voting-status${votingLocked ? ' locked' : ''}`;
 
-    container.querySelectorAll<HTMLButtonElement>('.tally-grid button').forEach(btn => {
+    container.querySelectorAll<HTMLButtonElement>('.ballot button').forEach(btn => {
       btn.disabled = votingLocked;
     });
 
     // Winner highlight
-    const ids = ['tally-card-up', 'tally-card-neutral', 'tally-card-down'];
-    ids.forEach(id => container.querySelector(`#${id}`)?.classList.remove('winner'));
-    container.querySelector('#tally-grid')?.classList.toggle('has-winner', votingLocked);
-    if (votingLocked) {
-      let up = 0, neutral = 0, down = 0;
-      votes.forEach(v => { if (v === 'up') up++; else if (v === 'down') down++; else neutral++; });
-      const winner = getWinner(up, neutral, down);
-      const cardId = winner === 'up' ? 'tally-card-up' : 'tally-card-down';
-      container.querySelector(`#${cardId}`)?.classList.add('winner');
-    }
+    applyWinnerHighlight(container, snapshot().winner, votingLocked);
   }
 
   function snapshot(): StateSnapshot {
@@ -411,18 +382,32 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     participants.forEach((p, id) => (ps[id] = p.name));
     const vs: Record<string, VoteValue> = {};
     votes.forEach((v, id) => (vs[id] = v));
-    return { type: 'state', topic, roundId, participants: ps, votes: vs, votingActive, resultsHidden, votingLocked, timerEndsAt };
+    const { counts, score } = [...votes.values()].reduce(
+      (acc, v) => { acc.counts[v]++; acc.score += v === 'up' ? 1 : v === 'down' ? -1 : 0; return acc; },
+      { score: 0, counts: { up: 0, neutral: 0, down: 0 } },
+    );
+    const winner: 'up' | 'down' = score > 0 ? 'up' : 'down';
+    return { type: 'state', topic, roundId, participants: ps, votes: vs, votingActive, resultsHidden, votingLocked, winner, counts, votedCount: votes.size, timerEndsAt };
+  }
+
+  function participantSnapshot(clientId: string, snap: StateSnapshot): StateSnapshot {
+    if (!snap.resultsHidden || snap.votingLocked) return snap;
+    const ownVote = votes.get(clientId);
+    const personalVotes: Record<string, VoteValue> = ownVote !== undefined ? { [clientId]: ownVote } : {};
+    return { ...snap, votes: personalVotes, counts: { up: 0, neutral: 0, down: 0 }, winner: 'up' };
   }
 
   function sendStateTo(conn: DataConnection) {
-    try { conn.send(snapshot()); } catch { /* ignore */ }
+    const clientId = peerToClient.get(conn.peer) ?? '';
+    const snap = snapshot();
+    try { conn.send(participantSnapshot(clientId, snap)); } catch { /* ignore */ }
   }
 
   function broadcast() {
     const snap = snapshot();
     participants.forEach((p, id) => {
       if (id !== 'host' && p.conn?.open) {
-        try { p.conn.send(snap); } catch { /* ignore */ }
+        try { p.conn.send(participantSnapshot(id, snap)); } catch { /* ignore */ }
       }
     });
   }

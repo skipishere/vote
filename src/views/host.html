@@ -65,30 +65,11 @@
         <!-- ACTIVE PANEL -->
         <div id="active-panel" hidden>
 
-          <div class="tally-grid" id="tally-grid">
-            <button class="tally-card up" id="tally-card-up" data-value="up" accesskey="1">
-              <div class="tally-icon">👍</div>
-              <div class="tally-count" id="tally-up">0</div>
-              <div class="tally-label">Continue</div>
-            </button>
-            <button class="tally-card neutral" id="tally-card-neutral" data-value="sideways" accesskey="2">
-              <div class="tally-icon">✊</div>
-              <div class="tally-count" id="tally-neutral">0</div>
-              <div class="tally-label">Either way</div>
-            </button>
-            <button class="tally-card down" id="tally-card-down" data-value="down" accesskey="3">
-              <div class="tally-icon">👎</div>
-              <div class="tally-count" id="tally-down">0</div>
-              <div class="tally-label">Move on</div>
-            </button>
-          </div>
+          <div id="ballot-slot"></div>
 
           <div id="voting-status" class="voting-status"></div>
 
-          <div id="timer-running-box" class="timer-compact" hidden>
-            <span>⏱ Time remaining</span>
-            <span id="timer-countdown" class="timer-countdown">0:00</span>
-          </div>
+          <div id="timer-slot"></div>
 
           <div class="controls-row">
             <button id="end-vote-btn">End vote</button>
