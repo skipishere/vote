@@ -1,7 +1,8 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
 import { getUserName, copyText, escHtml } from '../utils';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, ballotHtml, timerHtml, applyWinnerHighlight } from './shared';
+import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
+import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
 import hostHtml from './host.html?raw';
 
 interface ParticipantEntry {
@@ -22,6 +23,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   let topic          = '';
   let roundId        = String(Date.now());
   let hostVote: VoteValue | null = null;
+  let activeVoteType: VoteTypeDefinition = VOTE_TYPES[0];
   let votingActive   = false;
   let resultsHidden  = false;
   let votingLocked   = false;
@@ -36,7 +38,23 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   participants.set('host', { name: hostName, conn: null });
 
   container.innerHTML = hostHtml;
-  container.querySelector('#ballot-slot')!.outerHTML = ballotHtml;
+
+  // Populate vote type radio buttons from registry
+  const voteTypeOptions = container.querySelector<HTMLElement>('#vote-type-options')!;
+  VOTE_TYPES.forEach((vt, i) => {
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'vote-type';
+    radio.value = vt.id;
+    radio.checked = i === 0;
+    label.appendChild(radio);
+    label.append(` ${vt.label}`);
+    voteTypeOptions.appendChild(label);
+  });
+
+  injectBallots(container);
+
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
@@ -78,8 +96,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       } else if (msg.type === 'vote') {
         const clientId = peerToClient.get(conn.peer);
         if (clientId && votingActive && !votingLocked) {
-          if (msg.value === null) votes.delete(clientId);
-          else votes.set(clientId, msg.value);
+          if (msg.value === null) {
+            votes.delete(clientId);
+          } else if (activeVoteType.values.includes(msg.value)) {
+            votes.set(clientId, msg.value);
+          }
         }
       }
       broadcast();
@@ -125,9 +146,21 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   container.querySelector('#start-btn')!.addEventListener('click', () => {
     topic         = topicInput.value.trim();
     resultsHidden = container.querySelector<HTMLInputElement>('input[name="results-visibility"]:checked')?.value === 'hide';
+    activeVoteType = getVoteType(
+      container.querySelector<HTMLInputElement>('input[name="vote-type"]:checked')?.value ?? VOTE_TYPES[0].id
+    );
     votingActive  = true;
     votingLocked  = false;
     roundId       = String(Date.now());
+    votes.clear();
+    hostVote = null;
+
+    showActiveBallot(container, activeVoteType.id);
+    setVoteHighlight(container, null);
+    if (activeVoteType.renderVoters) activeVoteType.renderVoters(container, {}, {}, false);
+
+    const logoEl = container.querySelector<HTMLElement>('#logo-text');
+    if (logoEl) logoEl.textContent = activeVoteType.headerLabel;
 
     container.querySelector<HTMLElement>('#setup-panel')!.hidden = true;
     container.querySelector<HTMLElement>('#active-panel')!.hidden = false;
@@ -152,8 +185,13 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     topicInput.value = '';
     stopTimer();
     timerEndsAt = null;
+
+    showActiveBallot(container, VOTE_TYPES[0].id);
     setVoteHighlight(container, null);
     updateLockUI();
+
+    const logoEl = container.querySelector<HTMLElement>('#logo-text');
+    if (logoEl) logoEl.textContent = VOTE_TYPES[0].headerLabel;
 
     container.querySelector<HTMLElement>('#setup-panel')!.hidden = false;
     container.querySelector<HTMLElement>('#active-panel')!.hidden = true;
@@ -247,10 +285,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     btn.classList.toggle('btn-selected', meetingLocked);
   }
 
+  // Attach ballot click handlers across all vote type ballots
   container.querySelectorAll<HTMLButtonElement>('.ballot button').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (votingLocked) return;
-      const value = btn.getAttribute('data-value') as VoteValue;
+      const value = btn.getAttribute('data-value')!;
       if (hostVote === value) {
         hostVote = null;
         votes.delete('host');
@@ -302,11 +341,9 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
         ? `<span class="topic-text">${escHtml(topic)}</span>`
         : `<span class="topic-placeholder">No topic set</span>`;
 
-      // Tallies
+      // Tallies via active vote type
       const { counts } = snapshot();
-      (container.querySelector('#count-up')      as HTMLElement).textContent = String(counts.up);
-      (container.querySelector('#count-neutral') as HTMLElement).textContent = String(counts.neutral);
-      (container.querySelector('#count-down')    as HTMLElement).textContent = String(counts.down);
+      activeVoteType.renderCounts(container, counts, false);
 
       // Voted summary
       (container.querySelector('#voted-summary') as HTMLElement).textContent =
@@ -373,8 +410,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       btn.disabled = votingLocked;
     });
 
-    // Winner highlight
-    applyWinnerHighlight(container, snapshot().winner, votingLocked);
+    const snap = snapshot();
+    activeVoteType.applyWinner(container, snap.winner, votingLocked);
+    if (activeVoteType.renderVoters) {
+      activeVoteType.renderVoters(container, snap.votes, snap.participants, votingLocked);
+    }
   }
 
   function snapshot(): StateSnapshot {
@@ -382,19 +422,16 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     participants.forEach((p, id) => (ps[id] = p.name));
     const vs: Record<string, VoteValue> = {};
     votes.forEach((v, id) => (vs[id] = v));
-    const { counts, score } = [...votes.values()].reduce(
-      (acc, v) => { acc.counts[v]++; acc.score += v === 'up' ? 1 : v === 'down' ? -1 : 0; return acc; },
-      { score: 0, counts: { up: 0, neutral: 0, down: 0 } },
-    );
-    const winner: 'up' | 'down' = score > 0 ? 'up' : 'down';
-    return { type: 'state', topic, roundId, participants: ps, votes: vs, votingActive, resultsHidden, votingLocked, winner, counts, votedCount: votes.size, timerEndsAt };
+    const { counts, winner } = activeVoteType.computeResult([...votes.values()]);
+    return { type: 'state', topic, roundId, voteTypeId: activeVoteType.id, participants: ps, votes: vs, votingActive, resultsHidden, votingLocked, winner, counts, votedCount: votes.size, timerEndsAt };
   }
 
   function participantSnapshot(clientId: string, snap: StateSnapshot): StateSnapshot {
     if (!snap.resultsHidden || snap.votingLocked) return snap;
     const ownVote = votes.get(clientId);
     const personalVotes: Record<string, VoteValue> = ownVote !== undefined ? { [clientId]: ownVote } : {};
-    return { ...snap, votes: personalVotes, counts: { up: 0, neutral: 0, down: 0 }, winner: 'up' };
+    const emptyCounts = Object.fromEntries(activeVoteType.values.map(v => [v, 0]));
+    return { ...snap, votes: personalVotes, counts: emptyCounts, winner: null };
   }
 
   function sendStateTo(conn: DataConnection) {

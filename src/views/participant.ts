@@ -1,12 +1,15 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
 import { getClientId, getUserName, setUserName, escHtml } from '../utils';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, ballotHtml, timerHtml, applyWinnerHighlight } from './shared';
+import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
+import { getVoteType } from '../voteTypes';
 import participantHtml from './participant.html?raw';
 
 export function renderParticipant(container: HTMLElement, roomCode: string): () => void {
   container.innerHTML = participantHtml;
-  container.querySelector('#ballot-slot')!.outerHTML = ballotHtml;
+
+  injectBallots(container);
+
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   container.querySelector<HTMLElement>('#room-code-display')!.textContent = roomCode;
 
@@ -108,7 +111,7 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   container.querySelectorAll<HTMLButtonElement>('.ballot button').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!conn?.open) return;
-      const value = btn.getAttribute('data-value') as VoteValue;
+      const value = btn.getAttribute('data-value')!;
       if (currentVote === value) {
         currentVote = null;
         conn.send({ type: 'vote', value: null });
@@ -126,6 +129,10 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
 
     if (!snap.votingActive) return;
 
+    showActiveBallot(container, snap.voteTypeId);
+
+    const voteType = getVoteType(snap.voteTypeId);
+
     const topicBox = container.querySelector('#topic-box')!;
     topicBox.innerHTML = snap.topic
       ? `<span class="topic-text">${escHtml(snap.topic)}</span>`
@@ -134,15 +141,15 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
     const total = Object.keys(snap.participants).length;
     (container.querySelector('#voted-count') as HTMLElement).textContent = `${snap.votedCount} of ${total} voted`;
 
-    const { counts } = snap;
+    const logoEl = container.querySelector<HTMLElement>('#logo-text');
+    if (logoEl) logoEl.textContent = voteType.headerLabel;
+
     const hidden = snap.resultsHidden && !snap.votingLocked;
-
-    (container.querySelector('#count-up')      as HTMLElement).textContent = hidden ? '?' : String(counts.up);
-    (container.querySelector('#count-neutral') as HTMLElement).textContent = hidden ? '?' : String(counts.neutral);
-    (container.querySelector('#count-down')    as HTMLElement).textContent = hidden ? '?' : String(counts.down);
-    container.querySelector('#ballot')?.classList.toggle('results-hidden', hidden);
-
-    applyWinnerHighlight(container, snap.winner, snap.votingLocked && !hidden);
+    voteType.renderCounts(container, snap.counts, hidden);
+    voteType.applyWinner(container, snap.winner, snap.votingLocked && !hidden);
+    if (voteType.renderVoters) {
+      voteType.renderVoters(container, snap.votes, snap.participants, snap.votingLocked);
+    }
 
     const lockStatus = container.querySelector<HTMLElement>('#lock-banner')!;
     lockStatus.textContent = snap.votingLocked ? '🔒 Vote ended' : '';
