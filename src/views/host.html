@@ -2,7 +2,7 @@
   <div class="view-container">
 
     <div class="view-header">
-      <div class="logo">☕ Lean Coffee Vote</div>
+      <div class="logo" id="logo-text">☕ Lean Coffee Vote</div>
       <div class="view-header-actions">
         <span class="room-code-badge"></span>
         <button id="copy-code-btn" class="btn-sm">Copy code</button>
@@ -53,6 +53,13 @@
               <input type="radio" name="results-visibility" value="hide" />
               Hide until vote ends
             </label>
+          </div>
+
+          <hr />
+
+          <div class="section-label">Vote type</div>
+          <div class="radio-group" id="vote-type-options">
+            <!-- Populated from VOTE_TYPES registry -->
           </div>
 
           <hr />

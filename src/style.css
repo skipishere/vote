@@ -293,7 +293,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .ballot-option.up      > div:nth-child(2) { color: var(--up); }
 .ballot-option.down    > div:nth-child(2) { color: var(--down); }
 .ballot-option.neutral > div:nth-child(2) { color: var(--neutral); }
-.ballot.results-hidden > .ballot-option > div:nth-child(2) { opacity: 0.3; }
 
 /* ── Panels ── */
 .panel {
@@ -391,7 +390,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 #setup-panel :is(input[type="text"], .timer-options, .radio-group) { margin-bottom: 1rem; }
 
 /* ── Host active panel ── */
-#active-panel #ballot             { margin-bottom: 0.375rem; }
+#active-panel .ballot             { margin-bottom: 0.375rem; }
 #voting-status                   { margin-bottom: 0.5rem; }
 #reset-timer-form                { margin-top: 0.625rem; }
 #reset-timer-form .section-label { margin-bottom: 0.5rem; }
