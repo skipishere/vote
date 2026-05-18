@@ -133,10 +133,8 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
 
     const voteType = getVoteType(snap.voteTypeId);
 
-    const topicBox = container.querySelector('#topic-box')!;
-    topicBox.innerHTML = snap.topic
-      ? `<span class="topic-text">${escHtml(snap.topic)}</span>`
-      : `<span class="topic-placeholder">No topic set</span>`;
+    const topic = container.querySelector('#topic')!;
+    topic.textContent = snap.topic ? escHtml(snap.topic) : 'No topic set';
 
     const total = Object.keys(snap.participants).length;
     (container.querySelector('#voted-count') as HTMLElement).textContent = `${snap.votedCount} of ${total} voted`;

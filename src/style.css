@@ -392,8 +392,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
   align-items: center;
   justify-content: center;
 }
-.topic-text        { font-size: 1.0625rem; font-weight: 500; }
-.topic-placeholder { font-size: 0.9375rem; color: var(--text-muted); font-style: italic; }
+#topic        { font-size: 1rem; font-weight: 500; }
 
 /* ── Utilities ── */
 .mt-sm  { margin-top: 0.75rem; }
