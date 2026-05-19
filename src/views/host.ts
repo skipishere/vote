@@ -344,11 +344,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       activeVoteType.renderCounts(container, counts, false);
 
       // Voted summary
-      (container.querySelector('#voted-summary') as HTMLElement).textContent =
+      (container.querySelector('#voted-count') as HTMLElement).textContent =
         `${votes.size} of ${participants.size} voted`;
-    } else {
-      (container.querySelector('#voted-summary') as HTMLElement).textContent =
-        `${participants.size} in room`;
     }
 
     // Participants list
