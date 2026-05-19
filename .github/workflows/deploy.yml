@@ -31,6 +31,7 @@ jobs:
         # If you're using a custom domain or a user/org pages repo, set this to / instead.
         env:
           VITE_BASE_URL: /${{ github.event.repository.name }}/
+          VITE_TURN_WORKER_URL: ${{ secrets.VITE_TURN_WORKER_URL }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v5
