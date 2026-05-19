@@ -336,21 +336,16 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   function refreshUI() {
     if (votingActive) {
       // Topic
-      const topicDisplay = container.querySelector<HTMLElement>('#topic-display')!;
-      topicDisplay.innerHTML = topic
-        ? `<span class="topic-text">${escHtml(topic)}</span>`
-        : `<span class="topic-placeholder">No topic set</span>`;
+      const topicDisplay = container.querySelector<HTMLElement>('#topic')!;
+      topicDisplay.textContent = topic ? escHtml(topic) : 'No topic set';
 
       // Tallies via active vote type
       const { counts } = snapshot();
       activeVoteType.renderCounts(container, counts, false);
 
       // Voted summary
-      (container.querySelector('#voted-summary') as HTMLElement).textContent =
+      (container.querySelector('#voted-count') as HTMLElement).textContent =
         `${votes.size} of ${participants.size} voted`;
-    } else {
-      (container.querySelector('#voted-summary') as HTMLElement).textContent =
-        `${participants.size} in room`;
     }
 
     // Participants list

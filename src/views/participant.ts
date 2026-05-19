@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
 import { getClientId, getUserName, setUserName, escHtml } from '../utils';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
+import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot, hideError } from './shared';
 import { getVoteType } from '../voteTypes';
 import participantHtml from './participant.html?raw';
 
@@ -22,6 +22,7 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   let peer: Peer | null = null;
 
   function startSession(userName: string) {
+    hideError(container);
     container.querySelector<HTMLElement>('#gate-view')!.hidden = true;
     container.querySelector<HTMLElement>('#participant-view')!.hidden = false;
 
@@ -133,10 +134,8 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
 
     const voteType = getVoteType(snap.voteTypeId);
 
-    const topicBox = container.querySelector('#topic-box')!;
-    topicBox.innerHTML = snap.topic
-      ? `<span class="topic-text">${escHtml(snap.topic)}</span>`
-      : `<span class="topic-placeholder">No topic set</span>`;
+    const topic = container.querySelector('#topic')!;
+    topic.textContent = snap.topic ? escHtml(snap.topic) : 'No topic set';
 
     const total = Object.keys(snap.participants).length;
     (container.querySelector('#voted-count') as HTMLElement).textContent = `${snap.votedCount} of ${total} voted`;
