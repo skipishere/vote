@@ -1,5 +1,6 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
+import { getIceServers } from '../turn';
 import { getClientId, getUserName, setUserName, escHtml } from '../utils';
 import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot, hideError } from './shared';
 import { getVoteType } from '../voteTypes';
@@ -21,13 +22,15 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   let displayedTimerEndsAt: number | null = null;
   let peer: Peer | null = null;
 
-  function startSession(userName: string) {
+  async function startSession(userName: string) {
     hideError(container);
     container.querySelector<HTMLElement>('#gate-view')!.hidden = true;
     container.querySelector<HTMLElement>('#participant-view')!.hidden = false;
 
     const hostPeerId = 'lcv-' + roomCode.toLowerCase();
-    peer = new Peer();
+    const iceServers = await getIceServers();
+    const peerOpts = iceServers ? { config: { iceServers } } : {};
+    peer = new Peer(peerOpts);
 
     peer.on('open', () => {
       conn = peer!.connect(hostPeerId, { reliable: true });

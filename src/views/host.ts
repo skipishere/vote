@@ -1,5 +1,6 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
+import { getIceServers } from '../turn';
 import { getUserName, copyText, escHtml } from '../utils';
 import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
 import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
@@ -58,7 +59,12 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
-  const peer = new Peer(peerId);
+  let peer: Peer | null = null;
+
+  (async () => {
+    const iceServers = await getIceServers();
+    const peerOpts = iceServers ? { config: { iceServers } } : {};
+    peer = new Peer(peerId, peerOpts);
 
   peer.on('open', () => setStatus(container, 'connected', 'Live'));
 
@@ -121,6 +127,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       refreshUI();
     });
   });
+  })();
 
   const topicInput    = container.querySelector<HTMLInputElement>('#topic-input')!;
   const customTimer   = container.querySelector<HTMLInputElement>('#timer-custom')!;
@@ -255,7 +262,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   container.querySelector('#end-meeting-btn')!.addEventListener('click', () => {
     showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
-      peer.destroy();
+      peer?.destroy();
       window.location.hash = '/';
     });
   });
@@ -446,5 +453,5 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   refreshUI();
 
-  return () => { stopTimer(); peer.destroy(); };
+  return () => { stopTimer(); peer?.destroy(); };
 }
