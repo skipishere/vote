@@ -29,6 +29,11 @@ export function showError(container: HTMLElement, msg: string): void {
   el.hidden = false;
 }
 
+export function hideError(container: HTMLElement): void {
+  const el = container.querySelector<HTMLElement>('#error-msg')!;
+  el.hidden = true;
+}
+
 export const timerHtml = timerHtmlRaw;
 
 export function injectBallots(container: HTMLElement): void {

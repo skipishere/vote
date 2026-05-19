@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
 import { getClientId, getUserName, setUserName, escHtml } from '../utils';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
+import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot, hideError } from './shared';
 import { getVoteType } from '../voteTypes';
 import participantHtml from './participant.html?raw';
 
@@ -22,6 +22,7 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   let peer: Peer | null = null;
 
   function startSession(userName: string) {
+    hideError(container);
     container.querySelector<HTMLElement>('#gate-view')!.hidden = true;
     container.querySelector<HTMLElement>('#participant-view')!.hidden = false;
 
