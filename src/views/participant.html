@@ -1,6 +1,15 @@
-<div class="page page-centered">
+<div class="page">
+  <div class="view-container">
+    <div class="view-header">
+      <div class="logo" id="logo-text">🗳️ Remote Vote</div>
+      <div class="view-header-actions">
+        <span id="conn-status" class="status-chip status-connecting"><span></span>Connecting…</span>
+        <button id="leave-btn" class="btn-danger btn-sm">Leave</button>
+      </div>
+    </div>
+  </div>
+
   <div id="error-msg" class="error-msg" hidden></div>
-  <div class="logo" id="logo-text">🗳️ Remote Vote</div>
 
   <div id="gate-view">
     <div class="card">
@@ -14,20 +23,14 @@
   </div>
 
   <div id="participant-view" class="view-container" hidden>
-    <div class="view-header view-container">
-      <div class="view-header-actions">
-        <span id="conn-status" class="status-chip status-connecting"><span></span>Connecting…</span>
-        <button id="leave-btn" class="btn-danger btn-sm">Leave</button>
-      </div>
-    </div>
-
+    
     <div id="waiting-view" class="topic-box view-container">
-      <span class="topic-placeholder">⏳ Waiting for host to start the vote…</span>
+      <span>⏳ Waiting for host to start the vote…</span>
     </div>
 
     <div id="voting-view" class="view-container" hidden>
       <div class="topic-box">
-        <span id="topic" class="topic-placeholder">No topic set</span>
+        <span id="topic">No topic set</span>
       </div>
       <div class="section-label" id="voted-count">0 of 0 voted</div>
       <div id="ballot-slot"></div>
