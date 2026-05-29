@@ -1,7 +1,7 @@
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
 import { getUserName, copyText, generateRoomCode } from '../utils';
 import { RoomConnection, type DataConnection } from './roomConnection';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
+import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, createTimerController } from './shared';
 import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
 import hostHtml from './host.html?raw';
 
@@ -27,7 +27,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   let resultsHidden  = false;
   let votingLocked   = false;
   let timerEndsAt: number | null = null;
-  let timerInterval: ReturnType<typeof setInterval> | null = null;
   let setupTimerSeconds: number | null = null;
   let resetSecs = 60;
   let meetingLocked = false;
@@ -55,6 +54,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   injectBallots(container);
 
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
+  const timer = createTimerController(container, endVote);
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
   const connection = RoomConnection.host(roomCode, {
@@ -301,30 +301,18 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   });
 
   function startTimer(seconds: number) {
-    stopTimer();
     timerEndsAt = Date.now() + seconds * 1000;
-    const box     = container.querySelector<HTMLElement>('#timer-running-box')!;
-    const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
-    box.hidden = false;
-    timerInterval = setInterval(() => {
-      if (tickTimerEl(display, timerEndsAt!)) {
-        stopTimer();
-        box.hidden = true;
-        timerEndsAt = null;
-        endVote();
-      }
-    }, 500);
+    timer.startAt(timerEndsAt);
   }
 
   function stopTimer() {
-    if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+    timerEndsAt = null;
+    timer.stop();
   }
 
   function endVote() {
     votingLocked  = true;
     stopTimer();
-    timerEndsAt = null;
-    container.querySelector<HTMLElement>('#timer-running-box')!.hidden = true;
     updateLockUI();
     broadcast();
     refreshUI();

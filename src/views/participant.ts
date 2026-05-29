@@ -1,6 +1,6 @@
 import type { StateSnapshot, VoteValue } from '../types';
 import { getClientId, getUserName, setUserName } from '../utils';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot, hideError } from './shared';
+import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, hideError, createTimerController } from './shared';
 import { getVoteType } from '../voteTypes';
 import { RoomConnection } from './roomConnection';
 import participantHtml from './participant.html?raw';
@@ -13,10 +13,11 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   container.querySelector<HTMLElement>('#room-code-display')!.textContent = roomCode;
 
+  const timer = createTimerController(container);
+
   const myClientId = getClientId();
   let currentVote: VoteValue | null = null;
   let currentRoundId = '';
-  let timerInterval: ReturnType<typeof setInterval> | null = null;
   let displayedTimerEndsAt: number | null = null;
   let connection: RoomConnection | null = null;
 
@@ -34,13 +35,13 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
       onData(raw) {
         const msg = raw as { type: string };
         if (msg.type === 'kicked') {
-          showError(container, 'You have been removed from this meeting. <a href="#/">Return home</a>');
+          showError(container, 'You have been removed from this meeting.', { text: 'Return home', href: '#/' });
           setStatus(container, 'disconnected', 'Removed');
           enableButtons(false);
           return;
         }
         if (msg.type === 'rejected') {
-          showError(container, 'This meeting is locked — no new participants can join. <a href="#/">Return home</a>');
+          showError(container, 'This meeting is locked — no new participants can join.', { text: 'Return home', href: '#/' });
           setStatus(container, 'disconnected', 'Locked out');
           enableButtons(false);
           return;
@@ -59,14 +60,15 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
       onDisconnected() {
         setStatus(container, 'disconnected', 'Disconnected');
         enableButtons(false);
-        showError(container, 'The host has ended the meeting. <a href="#/">Return home</a>');
-        if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+        showError(container, 'The host has ended the meeting.', { text: 'Return home', href: '#/' });
+        timer.stop();
       },
       onError(err) {
         const msg = err.type === 'peer-unavailable'
-          ? `Meeting not found. Check the room code or wait for the host to connect. <a href="#/">Try again</a>`
+          ? 'Meeting not found. Check the room code or wait for the host to connect.'
           : `Connection error: ${err.message}`;
-        showError(container, msg);
+        const link = err.type === 'peer-unavailable' ? { text: 'Try again', href: '#/' } : undefined;
+        showError(container, msg, link);
         setStatus(container, 'disconnected', 'Error');
         enableButtons(false);
       },
@@ -152,17 +154,8 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   function updateTimer(endsAt: number | null) {
     if (endsAt === displayedTimerEndsAt) return;
     displayedTimerEndsAt = endsAt;
-    if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
-
-    const box = container.querySelector<HTMLElement>('#timer-running-box')!;
-    if (!endsAt) { box.hidden = true; return; }
-
-    const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
-    box.hidden = false;
-    tickTimerEl(display, endsAt);
-    timerInterval = setInterval(() => {
-      if (tickTimerEl(display, endsAt)) { clearInterval(timerInterval!); timerInterval = null; }
-    }, 500);
+    if (!endsAt) { timer.stop(); return; }
+    timer.startAt(endsAt);
   }
 
   function enableButtons(enabled: boolean) {
@@ -172,7 +165,7 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   }
 
   return () => {
-    if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+    timer.stop();
     connection?.destroy();
   };
 }
