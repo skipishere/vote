@@ -1,7 +1,7 @@
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
-import { getUserName, copyText, escHtml, generateRoomCode } from '../utils';
+import { getUserName, copyText, generateRoomCode } from '../utils';
 import { RoomConnection, type DataConnection } from './roomConnection';
-import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
+import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, createTimerController } from './shared';
 import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
 import hostHtml from './host.html?raw';
 
@@ -27,7 +27,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   let resultsHidden  = false;
   let votingLocked   = false;
   let timerEndsAt: number | null = null;
-  let timerInterval: ReturnType<typeof setInterval> | null = null;
   let setupTimerSeconds: number | null = null;
   let resetSecs = 60;
   let meetingLocked = false;
@@ -55,6 +54,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   injectBallots(container);
 
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
+  const timer = createTimerController(container, endVote);
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
   const connection = RoomConnection.host(roomCode, {
@@ -63,7 +63,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
       if (err.type === 'unavailable-id') {
         window.location.hash = `/host/${generateRoomCode()}`;
       } else {
-        showError(container, `Connection error: ${escHtml(err.message)}`);
+        showError(container, `Connection error: ${err.message}`);
         setStatus(container, 'disconnected', 'Error');
       }
     },
@@ -301,30 +301,18 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   });
 
   function startTimer(seconds: number) {
-    stopTimer();
     timerEndsAt = Date.now() + seconds * 1000;
-    const box     = container.querySelector<HTMLElement>('#timer-running-box')!;
-    const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
-    box.hidden = false;
-    timerInterval = setInterval(() => {
-      if (tickTimerEl(display, timerEndsAt!)) {
-        stopTimer();
-        box.hidden = true;
-        timerEndsAt = null;
-        endVote();
-      }
-    }, 500);
+    timer.startAt(timerEndsAt);
   }
 
   function stopTimer() {
-    if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+    timerEndsAt = null;
+    timer.stop();
   }
 
   function endVote() {
     votingLocked  = true;
     stopTimer();
-    timerEndsAt = null;
-    container.querySelector<HTMLElement>('#timer-running-box')!.hidden = true;
     updateLockUI();
     broadcast();
     refreshUI();
@@ -334,7 +322,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     if (votingActive) {
       // Topic
       const topicDisplay = container.querySelector<HTMLElement>('#topic')!;
-      topicDisplay.textContent = topic ? escHtml(topic) : 'No topic set';
+      topicDisplay.textContent = topic || 'No topic set';
 
       // Tallies via active vote type
       const { counts } = snapshot();
@@ -347,28 +335,41 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
     // Participants list
     const list = container.querySelector('#participant-list')!;
-    list.innerHTML = Array.from(participants.entries())
-      .map(([id, p]) => {
-        const tag = id === 'host' ? ` <small>(you)</small>` : '';
-        const badge = votingActive
-          ? (votes.has(id)
-              ? `<span class="voted-badge">✓ voted</span>`
-              : `<span class="waiting-badge">waiting…</span>`)
-          : '';
-        const kickBtn = id !== 'host'
-          ? `<button data-cid="${escHtml(id)}" title="Remove from meeting">✕</button>`
-          : '';
-        return `<li><span>${escHtml(p.name)}${tag}</span><span>${badge}</span><span>${kickBtn}</span></li>`;
-      })
-      .join('');
+    list.replaceChildren(...Array.from(participants.entries()).map(([id, p]) => {
+      const li = document.createElement('li');
 
-    list.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const cid  = btn.getAttribute('data-cid')!;
-        const name = participants.get(cid)?.name ?? 'this participant';
-        showModal('Remove participant', `Remove ${escHtml(name)} from the meeting?`, 'Remove', () => kickParticipant(cid));
-      });
-    });
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = p.name;
+      if (id === 'host') {
+        const small = document.createElement('small');
+        small.textContent = '(you)';
+        nameSpan.append(' ', small);
+      }
+
+      const badgeSpan = document.createElement('span');
+      if (votingActive) {
+        const badge = document.createElement('span');
+        badge.className = votes.has(id) ? 'voted-badge' : 'waiting-badge';
+        badge.textContent = votes.has(id) ? '✓ voted' : 'waiting…';
+        badgeSpan.appendChild(badge);
+      }
+
+      const kickSpan = document.createElement('span');
+      if (id !== 'host') {
+        const btn = document.createElement('button');
+        btn.dataset.cid = id;
+        btn.title = 'Remove from meeting';
+        btn.textContent = '✕';
+        btn.addEventListener('click', () => {
+          const name = participants.get(id)?.name ?? 'this participant';
+          showModal('Remove participant', `Remove ${name} from the meeting?`, 'Remove', () => kickParticipant(id));
+        });
+        kickSpan.appendChild(btn);
+      }
+
+      li.append(nameSpan, badgeSpan, kickSpan);
+      return li;
+    }));
   }
 
   function kickParticipant(clientId: string) {

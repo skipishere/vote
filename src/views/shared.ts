@@ -23,9 +23,16 @@ export function setStatus(container: HTMLElement, cls: string, label: string): v
   el.textContent = label;
 }
 
-export function showError(container: HTMLElement, msg: string): void {
+export function showError(container: HTMLElement, msg: string, link?: { text: string; href: string }): void {
   const el = container.querySelector<HTMLElement>('#error-msg')!;
-  el.innerHTML = msg;
+  el.textContent = msg;
+  if (link) {
+    el.append(' ');
+    const a = document.createElement('a');
+    a.href = link.href;
+    a.textContent = link.text;
+    el.appendChild(a);
+  }
   el.hidden = false;
 }
 
@@ -35,6 +42,28 @@ export function hideError(container: HTMLElement): void {
 }
 
 export const timerHtml = timerHtmlRaw;
+
+export function createTimerController(container: HTMLElement, onExpire?: () => void) {
+  const box = container.querySelector<HTMLElement>('#timer-running-box')!;
+  const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
+  let interval: ReturnType<typeof setInterval> | null = null;
+
+  function stop() {
+    if (interval !== null) { clearInterval(interval); interval = null; }
+    box.hidden = true;
+  }
+
+  function startAt(endsAt: number) {
+    stop();
+    box.hidden = false;
+    tickTimerEl(display, endsAt);
+    interval = setInterval(() => {
+      if (tickTimerEl(display, endsAt)) { stop(); onExpire?.(); }
+    }, 500);
+  }
+
+  return { startAt, stop };
+}
 
 export function injectBallots(container: HTMLElement): void {
   const ballotSlot = container.querySelector<HTMLElement>('#ballot-slot')!;
