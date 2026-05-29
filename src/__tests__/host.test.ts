@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { HostHandlers } from '../views/roomConnection';
+import type { DataConnection, HostHandlers } from '../views/roomConnection';
 import { RoomConnection } from '../views/roomConnection';
 import { renderHost } from '../views/host';
 
@@ -9,7 +9,7 @@ vi.mock('../views/roomConnection', () => ({
 
 function makePeerConn(peerId = 'peer-1') {
   const listeners: Record<string, (data?: unknown) => void> = {};
-  return {
+  const conn = {
     peer: peerId,
     open: true,
     on: vi.fn((event: string, cb: (data?: unknown) => void) => { listeners[event] = cb; }),
@@ -17,6 +17,7 @@ function makePeerConn(peerId = 'peer-1') {
     close: vi.fn(),
     emit: (event: string, data?: unknown) => listeners[event]?.(data),
   };
+  return conn as unknown as DataConnection & { emit: (event: string, data?: unknown) => void };
 }
 
 describe('renderHost', () => {
