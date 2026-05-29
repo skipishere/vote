@@ -1,5 +1,5 @@
 import type { StateSnapshot, VoteValue } from '../types';
-import { getClientId, getUserName, setUserName, escHtml } from '../utils';
+import { getClientId, getUserName, setUserName } from '../utils';
 import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot, hideError } from './shared';
 import { getVoteType } from '../voteTypes';
 import { RoomConnection } from './roomConnection';
@@ -120,7 +120,7 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
     const voteType = getVoteType(snap.voteTypeId);
 
     const topic = container.querySelector('#topic')!;
-    topic.textContent = snap.topic ? escHtml(snap.topic) : 'No topic set';
+    topic.textContent = snap.topic || 'No topic set';
 
     const total = Object.keys(snap.participants).length;
     (container.querySelector('#voted-count') as HTMLElement).textContent = `${snap.votedCount} of ${total} voted`;

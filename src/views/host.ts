@@ -334,7 +334,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     if (votingActive) {
       // Topic
       const topicDisplay = container.querySelector<HTMLElement>('#topic')!;
-      topicDisplay.textContent = topic ? escHtml(topic) : 'No topic set';
+      topicDisplay.textContent = topic || 'No topic set';
 
       // Tallies via active vote type
       const { counts } = snapshot();
