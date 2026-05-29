@@ -1,9 +1,8 @@
-import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, VoteValue } from '../types';
-import { getIceServers } from '../turn';
 import { getClientId, getUserName, setUserName, escHtml } from '../utils';
 import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot, hideError } from './shared';
 import { getVoteType } from '../voteTypes';
+import { RoomConnection } from './roomConnection';
 import participantHtml from './participant.html?raw';
 
 export function renderParticipant(container: HTMLElement, roomCode: string): () => void {
@@ -17,31 +16,22 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   const myClientId = getClientId();
   let currentVote: VoteValue | null = null;
   let currentRoundId = '';
-  let conn: DataConnection | null = null;
   let timerInterval: ReturnType<typeof setInterval> | null = null;
   let displayedTimerEndsAt: number | null = null;
-  let peer: Peer | null = null;
+  let connection: RoomConnection | null = null;
 
-  async function startSession(userName: string) {
+  function startSession(userName: string) {
     hideError(container);
     container.querySelector<HTMLElement>('#gate-view')!.hidden = true;
     container.querySelector<HTMLElement>('#participant-view')!.hidden = false;
 
-    const hostPeerId = 'lcv-' + roomCode.toLowerCase();
-    const iceServers = await getIceServers();
-    const peerOpts = iceServers ? { config: { iceServers } } : {};
-    peer = new Peer(peerOpts);
-
-    peer.on('open', () => {
-      conn = peer!.connect(hostPeerId, { reliable: true });
-
-      conn.on('open', () => {
-        conn!.send({ type: 'join', name: userName, clientId: myClientId });
+    connection = RoomConnection.participant(roomCode, {
+      onConnected() {
+        connection!.send({ type: 'join', name: userName, clientId: myClientId });
         setStatus(container, 'connected', 'Live');
         enableButtons(true);
-      });
-
-      conn.on('data', (raw) => {
+      },
+      onData(raw) {
         const msg = raw as { type: string };
         if (msg.type === 'kicked') {
           showError(container, 'You have been removed from this meeting. <a href="#/">Return home</a>');
@@ -65,29 +55,21 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
         }
 
         applySnapshot(snap);
-      });
-
-      conn.on('close', () => {
+      },
+      onDisconnected() {
         setStatus(container, 'disconnected', 'Disconnected');
         enableButtons(false);
         showError(container, 'The host has ended the meeting. <a href="#/">Return home</a>');
         if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
-      });
-
-      conn.on('error', () => {
+      },
+      onError(err) {
+        const msg = err.type === 'peer-unavailable'
+          ? `Meeting not found. Check the room code or wait for the host to connect. <a href="#/">Try again</a>`
+          : `Connection error: ${err.message}`;
+        showError(container, msg);
         setStatus(container, 'disconnected', 'Error');
         enableButtons(false);
-      });
-    });
-
-    peer.on('error', (err) => {
-      const type = (err as { type?: string }).type;
-      const msg = type === 'peer-unavailable'
-        ? `Meeting not found. Check the room code or wait for the host to connect. <a href="#/">Try again</a>`
-        : `Connection error: ${err.message}`;
-      showError(container, msg);
-      setStatus(container, 'disconnected', 'Error');
-      enableButtons(false);
+      },
     });
   }
 
@@ -108,20 +90,20 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   }
 
   container.querySelector('#leave-btn')!.addEventListener('click', () => {
-    peer?.destroy();
+    connection?.destroy();
     window.location.hash = '/';
   });
 
   container.querySelectorAll<HTMLButtonElement>('.ballot button').forEach((btn) => {
     btn.addEventListener('click', () => {
-      if (!conn?.open) return;
+      if (!connection?.isOpen) return;
       const value = btn.getAttribute('data-value')!;
       if (currentVote === value) {
         currentVote = null;
-        conn.send({ type: 'vote', value: null });
+        connection.send({ type: 'vote', value: null });
       } else {
         currentVote = value;
-        conn.send({ type: 'vote', value });
+        connection.send({ type: 'vote', value });
       }
       setVoteHighlight(container, currentVote);
     });
@@ -191,6 +173,6 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
 
   return () => {
     if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
-    peer?.destroy();
+    connection?.destroy();
   };
 }

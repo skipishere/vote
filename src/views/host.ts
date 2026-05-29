@@ -1,7 +1,6 @@
-import Peer, { type DataConnection } from 'peerjs';
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
-import { getIceServers } from '../turn';
-import { getUserName, copyText, escHtml } from '../utils';
+import { getUserName, copyText, escHtml, generateRoomCode } from '../utils';
+import { RoomConnection, type DataConnection } from './roomConnection';
 import { setStatus, showError, setVoteHighlight, tickTimerEl, timerHtml, injectBallots, showActiveBallot } from './shared';
 import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
 import hostHtml from './host.html?raw';
@@ -15,7 +14,6 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   const hostName = getUserName();
   if (!hostName) { window.location.hash = '/'; return () => {}; }
 
-  const peerId  = 'lcv-' + roomCode.toLowerCase();
   const joinUrl = `${location.origin}${location.pathname}#/join/${roomCode}`;
 
   const participants = new Map<string, ParticipantEntry>();
@@ -59,75 +57,67 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
-  let peer: Peer | null = null;
-
-  (async () => {
-    const iceServers = await getIceServers();
-    const peerOpts = iceServers ? { config: { iceServers } } : {};
-    peer = new Peer(peerId, peerOpts);
-
-  peer.on('open', () => setStatus(container, 'connected', 'Live'));
-
-  peer.on('error', (err) => {
-    if ((err as { type?: string }).type === 'unavailable-id') {
-      showError(container, 'This room code is already in use. Please go back and create a new meeting.');
-    } else {
-      showError(container, `Connection error: ${escHtml(err.message)}`);
-    }
-    setStatus(container, 'disconnected', 'Error');
-  });
-
-  peer.on('connection', (conn) => {
-    conn.on('data', (raw) => {
-      const msg = raw as ParticipantMessage;
-      if (msg.type === 'join') {
-        const { clientId, name } = msg;
-        if (bannedClients.has(clientId)) {
-          try { conn.send({ type: 'kicked' }); } catch { /* ignore */ }
-          conn.close();
-          return;
-        }
-        if (meetingLocked && !allowedClients.has(clientId)) {
-          try { conn.send({ type: 'rejected' }); } catch { /* ignore */ }
-          conn.close();
-          return;
-        }
-        allowedClients.add(clientId);
-        for (const [pid, cid] of peerToClient) {
-          if (cid === clientId && pid !== conn.peer) peerToClient.delete(pid);
-        }
-        peerToClient.set(conn.peer, clientId);
-        participants.set(clientId, { name, conn });
-        sendStateTo(conn);
-      } else if (msg.type === 'vote') {
-        const clientId = peerToClient.get(conn.peer);
-        if (clientId && votingActive && !votingLocked) {
-          if (msg.value === null) {
-            votes.delete(clientId);
-          } else if (activeVoteType.values.includes(msg.value)) {
-            votes.set(clientId, msg.value);
+  const connection = RoomConnection.host(roomCode, {
+    onReady() { setStatus(container, 'connected', 'Live'); },
+    onError(err) {
+      if (err.type === 'unavailable-id') {
+        window.location.hash = `/host/${generateRoomCode()}`;
+      } else {
+        showError(container, `Connection error: ${escHtml(err.message)}`);
+        setStatus(container, 'disconnected', 'Error');
+      }
+    },
+    onConnection(conn) {
+      conn.on('data', (raw) => {
+        const msg = raw as ParticipantMessage;
+        if (msg.type === 'join') {
+          const { clientId, name } = msg;
+          if (bannedClients.has(clientId)) {
+            try { conn.send({ type: 'kicked' }); } catch { /* ignore */ }
+            conn.close();
+            return;
+          }
+          if (meetingLocked && !allowedClients.has(clientId)) {
+            try { conn.send({ type: 'rejected' }); } catch { /* ignore */ }
+            conn.close();
+            return;
+          }
+          allowedClients.add(clientId);
+          for (const [pid, cid] of peerToClient) {
+            if (cid === clientId && pid !== conn.peer) peerToClient.delete(pid);
+          }
+          peerToClient.set(conn.peer, clientId);
+          participants.set(clientId, { name, conn });
+          sendStateTo(conn);
+        } else if (msg.type === 'vote') {
+          const clientId = peerToClient.get(conn.peer);
+          if (clientId && votingActive && !votingLocked) {
+            if (msg.value === null) {
+              votes.delete(clientId);
+            } else if (activeVoteType.values.includes(msg.value)) {
+              votes.set(clientId, msg.value);
+            }
           }
         }
-      }
-      broadcast();
-      refreshUI();
-    });
+        broadcast();
+        refreshUI();
+      });
 
-    conn.on('close', () => {
-      const clientId = peerToClient.get(conn.peer);
-      peerToClient.delete(conn.peer);
-      if (clientId) {
-        const entry = participants.get(clientId);
-        if (entry?.conn === conn) {
-          participants.delete(clientId);
-          votes.delete(clientId);
+      conn.on('close', () => {
+        const clientId = peerToClient.get(conn.peer);
+        peerToClient.delete(conn.peer);
+        if (clientId) {
+          const entry = participants.get(clientId);
+          if (entry?.conn === conn) {
+            participants.delete(clientId);
+            votes.delete(clientId);
+          }
         }
-      }
-      broadcast();
-      refreshUI();
-    });
+        broadcast();
+        refreshUI();
+      });
+    },
   });
-  })();
 
   const topicInput    = container.querySelector<HTMLInputElement>('#topic-input')!;
   const customTimer   = container.querySelector<HTMLInputElement>('#timer-custom')!;
@@ -262,7 +252,7 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   container.querySelector('#end-meeting-btn')!.addEventListener('click', () => {
     showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {
-      peer?.destroy();
+      connection.destroy();
       window.location.hash = '/';
     });
   });
@@ -453,5 +443,5 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   refreshUI();
 
-  return () => { stopTimer(); peer?.destroy(); };
+  return () => { stopTimer(); connection.destroy(); };
 }
