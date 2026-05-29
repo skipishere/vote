@@ -35,7 +35,7 @@ export class RoomConnection {
 
   static participant(roomCode: string, handlers: ParticipantHandlers): RoomConnection {
     const c = new RoomConnection();
-    c.connectParticipant(roomCode, undefined, handlers);
+    c.connectParticipant(roomCode, handlers);
     return c;
   }
 
@@ -55,11 +55,9 @@ export class RoomConnection {
     this.conn = null;
   }
 
-  private async openHost(roomCode: string, handlers: HostHandlers): Promise<void> {
-    const iceServers = await getIceServers();
+  private openHost(roomCode: string, handlers: HostHandlers): void {
     if (this.destroyed) return;
-
-    this.peer = new Peer('lcv-' + roomCode.toLowerCase(), iceServers ? { config: { iceServers } } : {});
+    this.peer = new Peer('lcv-' + roomCode.toLowerCase());
     this.peer.on('open', () => handlers.onReady());
     this.peer.on('connection', (conn) => handlers.onConnection(conn));
     this.peer.on('error', (err) => handlers.onError(err as PeerErrorInfo));
@@ -67,8 +65,8 @@ export class RoomConnection {
 
   private connectParticipant(
     roomCode: string,
-    iceServers: RTCIceServer[] | undefined,
     handlers: ParticipantHandlers,
+    iceServers?: RTCIceServer[],
   ): void {
     if (this.destroyed) return;
     this.peer?.destroy();
@@ -84,7 +82,11 @@ export class RoomConnection {
           this.fallbackTimer = null;
           if (!this.conn?.open && !this.destroyed) {
             const servers = await getIceServers();
-            if (servers) this.connectParticipant(roomCode, servers, handlers);
+            if (servers) {
+              this.connectParticipant(roomCode, handlers, servers);
+            } else {
+              handlers.onError({ message: 'Could not connect to the meeting.' });
+            }
           }
         }, TURN_FALLBACK_MS);
       }
