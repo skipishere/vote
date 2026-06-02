@@ -512,15 +512,22 @@ button.btn-selected {
 }
 .timer-compact span:first-child { font-size: 0.8125rem; color: var(--text-muted); }
 
-.siren-toggle {
+.settings-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9375rem;
   cursor: pointer;
-  user-select: none;
-  margin-top: 0.375rem;
+  padding: 0.25rem 0;
 }
 
 .modal-backdrop {
