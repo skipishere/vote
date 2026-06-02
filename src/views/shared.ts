@@ -1,4 +1,4 @@
-import { formatTime } from '../utils';
+import { formatTime, getSirenEnabled, setSirenEnabled } from '../utils';
 import timerHtmlRaw from './timer.html?raw';
 import { VOTE_TYPES } from '../voteTypes';
 
@@ -46,7 +46,15 @@ export const timerHtml = timerHtmlRaw;
 export function createTimerController(container: HTMLElement, onExpire?: () => void) {
   const box = container.querySelector<HTMLElement>('#timer-running-box')!;
   const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
+  const sirenCheckbox = container.querySelector<HTMLInputElement>('#siren-enabled');
   let interval: ReturnType<typeof setInterval> | null = null;
+
+  if (sirenCheckbox) {
+    sirenCheckbox.checked = getSirenEnabled();
+    sirenCheckbox.addEventListener('change', () => setSirenEnabled(sirenCheckbox.checked));
+  }
+
+  const sirenAudio = new Audio('/audio/bbc_sirens---b_07027201.mp3');
 
   function stop() {
     if (interval !== null) { clearInterval(interval); interval = null; }
@@ -58,7 +66,11 @@ export function createTimerController(container: HTMLElement, onExpire?: () => v
     box.hidden = false;
     tickTimerEl(display, endsAt);
     interval = setInterval(() => {
-      if (tickTimerEl(display, endsAt)) { stop(); onExpire?.(); }
+      if (tickTimerEl(display, endsAt)) {
+        stop();
+        if (sirenCheckbox?.checked) sirenAudio.play().catch(() => {});
+        onExpire?.();
+      }
     }, 500);
   }
 
