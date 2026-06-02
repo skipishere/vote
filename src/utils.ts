@@ -33,6 +33,14 @@ export async function copyText(text: string): Promise<void> {
   }
 }
 
+export function getSirenEnabled(): boolean {
+  return localStorage.getItem('lcv_sirenEnabled') === 'true';
+}
+
+export function setSirenEnabled(enabled: boolean): void {
+  localStorage.setItem('lcv_sirenEnabled', String(enabled));
+}
+
 export function formatTime(ms: number): string {
   const secs = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
