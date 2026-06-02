@@ -3,6 +3,11 @@ import timerHtmlRaw from './timer.html?raw';
 import settingsPanelHtmlRaw from './settings-panel.html?raw';
 import { VOTE_TYPES } from '../voteTypes';
 
+document.documentElement.style.setProperty(
+  '--settings-icon-url',
+  `url(${import.meta.env.BASE_URL}icons/settings.svg)`
+);
+
 export function setVoteHighlight(container: HTMLElement, selected: string | null): void {
   container.querySelectorAll<HTMLButtonElement>('.ballot:not([hidden]) button').forEach(btn =>
     btn.classList.toggle('selected', btn.getAttribute('data-value') === selected)
@@ -47,7 +52,7 @@ export const timerHtml = timerHtmlRaw;
 export function createTimerController(container: HTMLElement, onExpire?: () => void) {
   const box = container.querySelector<HTMLElement>('#timer-running-box')!;
   const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
-  const sirenAudio = new Audio('/audio/bbc_sirens---b_07027201.mp3');
+  const sirenAudio = new Audio(`${import.meta.env.BASE_URL}audio/bbc_sirens---b_07027201.mp3`);
   let interval: ReturnType<typeof setInterval> | null = null;
 
   function stop() {
