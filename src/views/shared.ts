@@ -1,5 +1,6 @@
-import { formatTime } from '../utils';
+import { formatTime, getSirenEnabled, setSirenEnabled } from '../utils';
 import timerHtmlRaw from './timer.html?raw';
+import settingsPanelHtmlRaw from './settings-panel.html?raw';
 import { VOTE_TYPES } from '../voteTypes';
 
 export function setVoteHighlight(container: HTMLElement, selected: string | null): void {
@@ -46,6 +47,7 @@ export const timerHtml = timerHtmlRaw;
 export function createTimerController(container: HTMLElement, onExpire?: () => void) {
   const box = container.querySelector<HTMLElement>('#timer-running-box')!;
   const display = container.querySelector<HTMLElement>('#timer-running-box span:last-child')!;
+  const sirenAudio = new Audio('/audio/bbc_sirens---b_07027201.mp3');
   let interval: ReturnType<typeof setInterval> | null = null;
 
   function stop() {
@@ -58,11 +60,35 @@ export function createTimerController(container: HTMLElement, onExpire?: () => v
     box.hidden = false;
     tickTimerEl(display, endsAt);
     interval = setInterval(() => {
-      if (tickTimerEl(display, endsAt)) { stop(); onExpire?.(); }
+      if (tickTimerEl(display, endsAt)) {
+        stop();
+        if (getSirenEnabled()) sirenAudio.play().catch(() => {});
+        onExpire?.();
+      }
     }, 500);
   }
 
   return { startAt, stop };
+}
+
+export function createSettingsController(container: HTMLElement) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = settingsPanelHtmlRaw;
+  container.appendChild(wrapper.firstElementChild!);
+
+  const backdrop = container.querySelector<HTMLElement>('#settings-backdrop')!;
+  const checkbox = container.querySelector<HTMLInputElement>('#siren-enabled')!;
+
+  checkbox.checked = getSirenEnabled();
+  checkbox.addEventListener('change', () => setSirenEnabled(checkbox.checked));
+
+  container.querySelector('#settings-close-btn')!.addEventListener('click', close);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+
+  function open()  { backdrop.hidden = false; }
+  function close() { backdrop.hidden = true; }
+
+  return { open, close };
 }
 
 export function injectBallots(container: HTMLElement): void {

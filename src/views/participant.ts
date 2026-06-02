@@ -1,6 +1,6 @@
 import type { StateSnapshot, VoteValue } from '../types';
 import { getClientId, getUserName, setUserName } from '../utils';
-import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, hideError, createTimerController } from './shared';
+import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, hideError, createTimerController, createSettingsController } from './shared';
 import { getVoteType } from '../voteTypes';
 import { RoomConnection } from './roomConnection';
 import participantHtml from './participant.html?raw';
@@ -14,6 +14,8 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   container.querySelector<HTMLElement>('#room-code-display')!.textContent = roomCode;
 
   const timer = createTimerController(container);
+  const settings = createSettingsController(container);
+  container.querySelector('#settings-btn')!.addEventListener('click', () => settings.open());
 
   const myClientId = getClientId();
   let currentVote: VoteValue | null = null;
