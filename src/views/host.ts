@@ -1,7 +1,7 @@
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
 import { getUserName, copyText, generateRoomCode } from '../utils';
 import { RoomConnection, type DataConnection } from './roomConnection';
-import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, createTimerController } from './shared';
+import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, createTimerController, createSettingsController } from './shared';
 import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
 import hostHtml from './host.html?raw';
 
@@ -55,6 +55,8 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
 
   container.querySelector('#timer-slot')!.outerHTML = timerHtml;
   const timer = createTimerController(container, endVote);
+  const settings = createSettingsController(container);
+  container.querySelector('#settings-btn')!.addEventListener('click', () => settings.open());
   container.querySelector<HTMLElement>('.room-code-badge')!.textContent = roomCode;
 
   const connection = RoomConnection.host(roomCode, {
