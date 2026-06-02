@@ -512,6 +512,30 @@ button.btn-selected {
 }
 .timer-compact span:first-child { font-size: 0.8125rem; color: var(--text-muted); }
 
+.settings-btn-icon {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 50;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 1.125rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transition: color 0.15s, background 0.15s;
+}
+.settings-btn-icon:hover { color: var(--text); background: var(--surface-2); }
+.settings-btn-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .settings-header {
   display: flex;
   justify-content: space-between;
