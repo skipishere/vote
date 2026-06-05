@@ -1,12 +1,10 @@
-<div id="settings-backdrop" class="modal-backdrop" hidden>
-  <div class="modal-card">
-    <div class="settings-header">
-      <span>Settings</span>
-      <button id="settings-close-btn" class="btn-sm">✕</button>
-    </div>
-    <label class="settings-row">
-      <span>Sound alert when timer ends</span>
-      <input type="checkbox" id="siren-enabled" />
-    </label>
+<dialog id="settings-dialog" class="modal-card" aria-labelledby="settings-title">
+  <div class="settings-header">
+    <span id="settings-title">Settings</span>
+    <button id="settings-close-btn" class="btn-sm" aria-label="Close settings">✕</button>
   </div>
-</div>
+  <label class="settings-row">
+    <span>Sound alert when timer ends</span>
+    <input type="checkbox" id="siren-enabled" />
+  </label>
+</dialog>

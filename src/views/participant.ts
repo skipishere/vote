@@ -22,11 +22,14 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   let currentRoundId = '';
   let displayedTimerEndsAt: number | null = null;
   let connection: RoomConnection | null = null;
+  let lastVotingActive = false;
 
   function startSession(userName: string) {
     hideError(container);
     container.querySelector<HTMLElement>('#gate-view')!.hidden = true;
-    container.querySelector<HTMLElement>('#participant-view')!.hidden = false;
+    const participantView = container.querySelector<HTMLElement>('#participant-view')!;
+    participantView.hidden = false;
+    participantView.focus();
 
     connection = RoomConnection.participant(roomCode, {
       onConnected() {
@@ -114,10 +117,16 @@ export function renderParticipant(container: HTMLElement, roomCode: string): () 
   });
 
   function applySnapshot(snap: StateSnapshot) {
+    const becameActive = snap.votingActive && !lastVotingActive;
+    lastVotingActive = snap.votingActive;
+
     container.querySelector<HTMLElement>('#waiting-view')!.hidden = snap.votingActive;
-    container.querySelector<HTMLElement>('#voting-view')!.hidden = !snap.votingActive;
+    const votingView = container.querySelector<HTMLElement>('#voting-view')!;
+    votingView.hidden = !snap.votingActive;
 
     if (!snap.votingActive) return;
+
+    if (becameActive) votingView.focus();
 
     showActiveBallot(container, snap.voteTypeId);
 

@@ -13,6 +13,10 @@
   --accent: #6366f1;
   --accent-bg: rgba(99, 102, 241, 0.12);
 
+  /* ── Focus ── */
+  /* Lighter than --accent so the ring keeps ≥3:1 contrast even on --surface-2 */
+  --focus: #a5b4fc;
+
   /* ── Vote outcomes ── */
   --neutral: var(--text-muted);
   --neutral-bg: rgba(148, 163, 184, 0.12);
@@ -163,6 +167,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-danger  { background: var(--danger-bg); color: var(--danger); }
 .btn-full    { width: 100%; }
 .btn-sm      { padding: 0.4rem 0.875rem; font-size: 0.875rem; }
+
+/* ── Focus indicators (keyboard navigation only) ── */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Higher specificity than the input rule that sets `outline: none` */
+:is(input[type="text"], input[type="number"]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+/* Containers we move focus to programmatically shouldn't show a ring */
+.focus-target:focus { outline: none; }
 
 /* ── Tabs ── */
 .tabs {
@@ -486,7 +504,7 @@ button.btn-selected {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 5px var(--accent);
 }
-.radio-group label input[type="radio"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.radio-group label input[type="radio"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* ── Vote locked indicator ── */
 .voting-status        { font-size: 0.8125rem; text-align: center; color: var(--text-muted); min-height: 1.25rem; }
@@ -547,7 +565,7 @@ button.btn-selected {
   -webkit-mask-position: center;
 }
 .settings-btn-icon:hover { color: var(--text); }
-.settings-btn-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-btn-icon:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .settings-header {
   display: flex;
@@ -567,26 +585,20 @@ button.btn-selected {
   padding: 0.25rem 0;
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  z-index: 100;
-}
-.modal-backdrop:not([hidden]) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* Native <dialog>: the element is the card, ::backdrop is the overlay.
+   showModal() handles focus trap, Escape, focus restore and page inertness. */
 .modal-card {
   background: var(--surface);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.5rem;
   width: calc(100% - 2rem);
   max-width: 380px;
   box-shadow: var(--shadow-lg);
+  margin: auto;
 }
+.modal-card::backdrop { background: var(--overlay); }
 #modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
 #modal-body  { font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
