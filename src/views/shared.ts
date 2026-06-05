@@ -47,6 +47,20 @@ export function hideError(container: HTMLElement): void {
   el.hidden = true;
 }
 
+/**
+ * Close a modal <dialog> when the user clicks its ::backdrop. A click on the
+ * backdrop reports the dialog as the event target, so we close only when the
+ * pointer falls outside the dialog's own box (robust against the card's padding).
+ */
+export function closeOnBackdropClick(dialog: HTMLDialogElement, close: () => void): void {
+  dialog.addEventListener('click', (e) => {
+    const r = dialog.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right
+                && e.clientY >= r.top  && e.clientY <= r.bottom;
+    if (!inside) close();
+  });
+}
+
 export const timerHtml = timerHtmlRaw;
 
 export function createTimerController(container: HTMLElement, onExpire?: () => void) {
@@ -81,17 +95,17 @@ export function createSettingsController(container: HTMLElement) {
   wrapper.innerHTML = settingsPanelHtmlRaw;
   container.appendChild(wrapper.firstElementChild!);
 
-  const backdrop = container.querySelector<HTMLElement>('#settings-backdrop')!;
+  const dialog   = container.querySelector<HTMLDialogElement>('#settings-dialog')!;
   const checkbox = container.querySelector<HTMLInputElement>('#siren-enabled')!;
 
   checkbox.checked = getSirenEnabled();
   checkbox.addEventListener('change', () => setSirenEnabled(checkbox.checked));
 
   container.querySelector('#settings-close-btn')!.addEventListener('click', close);
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+  closeOnBackdropClick(dialog, close);
 
-  function open()  { backdrop.hidden = false; }
-  function close() { backdrop.hidden = true; }
+  function open()  { dialog.showModal(); }
+  function close() { dialog.close(); }
 
   return { open, close };
 }

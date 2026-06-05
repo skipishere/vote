@@ -1,7 +1,7 @@
 import type { StateSnapshot, ParticipantMessage, VoteValue } from '../types';
 import { getUserName, copyText, generateRoomCode } from '../utils';
 import { RoomConnection, type DataConnection } from './roomConnection';
-import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, createTimerController, createSettingsController } from './shared';
+import { setStatus, showError, setVoteHighlight, timerHtml, injectBallots, showActiveBallot, createTimerController, createSettingsController, closeOnBackdropClick } from './shared';
 import { VOTE_TYPES, getVoteType, type VoteTypeDefinition } from '../voteTypes';
 import hostHtml from './host.html?raw';
 
@@ -162,8 +162,10 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     if (logoEl) logoEl.textContent = activeVoteType.headerLabel;
 
     container.querySelector<HTMLElement>('#setup-panel')!.hidden = true;
-    container.querySelector<HTMLElement>('#active-panel')!.hidden = false;
+    const activePanel = container.querySelector<HTMLElement>('#active-panel')!;
+    activePanel.hidden = false;
     container.querySelector<HTMLElement>('#topic-display')!.hidden = false;
+    activePanel.focus();
 
     if (setupTimerSeconds !== null) startTimer(setupTimerSeconds);
 
@@ -192,9 +194,11 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     const logoEl = container.querySelector<HTMLElement>('#logo-text');
     if (logoEl) logoEl.textContent = VOTE_TYPES[0].headerLabel;
 
-    container.querySelector<HTMLElement>('#setup-panel')!.hidden = false;
+    const setupPanel = container.querySelector<HTMLElement>('#setup-panel')!;
+    setupPanel.hidden = false;
     container.querySelector<HTMLElement>('#active-panel')!.hidden = true;
     container.querySelector<HTMLElement>('#topic-display')!.hidden = true;
+    setupPanel.focus();
 
     broadcast();
     refreshUI();
@@ -231,26 +235,29 @@ export function renderHost(container: HTMLElement, roomCode: string): () => void
     refreshUI();
   });
 
+  const modalDialog     = container.querySelector<HTMLDialogElement>('#modal-dialog')!;
+  const modalConfirmBtn = container.querySelector<HTMLButtonElement>('#modal-confirm-btn')!;
+  const modalCancelBtn  = container.querySelector<HTMLButtonElement>('#modal-cancel-btn')!;
+  let modalOnConfirm: (() => void) | null = null;
+
   function showModal(title: string, body: string, confirmLabel: string, onConfirm: () => void) {
     (container.querySelector('#modal-title') as HTMLElement).textContent = title;
     (container.querySelector('#modal-body')  as HTMLElement).textContent = body;
-    const confirmBtn = container.querySelector<HTMLButtonElement>('#modal-confirm-btn')!;
-    confirmBtn.textContent = confirmLabel;
-    const backdrop = container.querySelector<HTMLElement>('#modal-backdrop')!;
-    backdrop.hidden = false;
-
-    const finish = (run: boolean) => {
-      backdrop.hidden = true;
-      confirmBtn.onclick = null;
-      cancelBtn.onclick  = null;
-      backdrop.onclick   = null;
-      if (run) onConfirm();
-    };
-    const cancelBtn = container.querySelector<HTMLButtonElement>('#modal-cancel-btn')!;
-    confirmBtn.onclick = () => finish(true);
-    cancelBtn.onclick  = () => finish(false);
-    backdrop.onclick   = (e) => { if (e.target === backdrop) finish(false); };
+    modalConfirmBtn.textContent = confirmLabel;
+    modalOnConfirm = onConfirm;
+    modalDialog.showModal();
   }
+
+  // Cancel, backdrop click and Escape all close the dialog without confirming;
+  // the native 'close' event clears the pending action so only Confirm runs it.
+  modalDialog.addEventListener('close', () => { modalOnConfirm = null; });
+  modalConfirmBtn.addEventListener('click', () => {
+    const run = modalOnConfirm;
+    modalDialog.close();
+    run?.();
+  });
+  modalCancelBtn.addEventListener('click', () => modalDialog.close());
+  closeOnBackdropClick(modalDialog, () => modalDialog.close());
 
   container.querySelector('#end-meeting-btn')!.addEventListener('click', () => {
     showModal('End meeting', 'End the meeting? All vote data will be lost.', 'End meeting', () => {

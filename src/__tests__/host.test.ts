@@ -120,7 +120,7 @@ describe('renderHost', () => {
 
     it('opens a confirmation modal when the kick button is clicked', () => {
       container.querySelector<HTMLButtonElement>('#participant-list button')!.click();
-      expect(container.querySelector<HTMLElement>('#modal-backdrop')!.hidden).toBe(false);
+      expect(container.querySelector<HTMLDialogElement>('#modal-dialog')!.open).toBe(true);
       expect(container.querySelector('#modal-title')!.textContent).toBe('Remove participant');
       expect(container.querySelector('#modal-body')!.textContent).toContain('Alice');
     });

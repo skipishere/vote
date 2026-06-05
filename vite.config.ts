@@ -4,5 +4,6 @@ export default defineConfig({
   base: process.env.VITE_BASE_URL ?? '/',
   test: {
     environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

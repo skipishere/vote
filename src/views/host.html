@@ -26,7 +26,7 @@
       <div>
 
         <!-- SETUP PANEL -->
-        <div id="setup-panel" class="panel">
+        <div id="setup-panel" class="panel focus-target" tabindex="-1">
           <div class="section-label">Topic</div>
           <input id="topic-input" type="text" placeholder="What are we discussing? (optional)" maxlength="120" />
 
@@ -71,7 +71,7 @@
         </div>
 
         <!-- ACTIVE PANEL -->
-        <div id="active-panel" hidden>
+        <div id="active-panel" class="focus-target" tabindex="-1" hidden>
           <div class="section-label" id="voted-count">0 of 0 voted</div>
           <div id="ballot-slot"></div>
 
@@ -110,15 +110,13 @@
     </div>
   </div>
 
-  <div id="modal-backdrop" class="modal-backdrop" hidden>
-    <div class="modal-card">
-      <div id="modal-title"></div>
-      <div id="modal-body"></div>
-      <div class="modal-actions">
-        <button id="modal-cancel-btn">Cancel</button>
-        <button id="modal-confirm-btn" class="btn-danger">Confirm</button>
-      </div>
+  <dialog id="modal-dialog" class="modal-card" aria-labelledby="modal-title" aria-describedby="modal-body">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button id="modal-cancel-btn">Cancel</button>
+      <button id="modal-confirm-btn" class="btn-danger">Confirm</button>
     </div>
-  </div>
+  </dialog>
 
 </div>
