@@ -596,6 +596,7 @@ button.btn-selected {
   width: calc(100% - 2rem);
   max-width: 380px;
   box-shadow: var(--shadow-lg);
+  margin: auto;
 }
 .modal-card::backdrop { background: var(--overlay); }
 #modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
