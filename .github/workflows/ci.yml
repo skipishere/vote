@@ -25,20 +25,19 @@ jobs:
 
   worker:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: worker
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: actions/setup-node@v7
         with:
           cache: 'npm'
-          cache-dependency-path: worker/package-lock.json
 
       - run: npm ci
 
-      - run: npm run typecheck
+      - run: npm ci
+        working-directory: worker
 
-      # Bundles src/index.ts against wrangler.toml; no Cloudflare creds needed.
+      - run: npm run typecheck:worker
+
       - run: npx wrangler deploy --dry-run
+        working-directory: worker
