@@ -21,8 +21,6 @@ updates:
       default-days: 7
     labels: ["dependencies"]
 
-  # worker/ has its own package.json (wrangler); without this entry it only ever
-  # receives security updates, not version updates.
   - package-ecosystem: "npm"
     directory: "/worker"
     schedule:

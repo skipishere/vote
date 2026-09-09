@@ -1,15 +1,7 @@
 name: Dependabot auto-merge
 
-# Enables GitHub's auto-merge on Dependabot PRs so they merge once CI passes.
-# The "Protected main" ruleset uses strict status checks, which means a PR must
-# be up to date with main to merge. Auto-merge is what keeps the branches
-# current -- without it, every Dependabot PR falls behind and stalls.
-#
-# Major version bumps are deliberately excluded: those still need a human.
-#
-# pull_request_target is required because GITHUB_TOKEN is read-only on
-# Dependabot-triggered pull_request runs. This job never checks out PR code, so
-# the elevated context is not exposed to anything the PR author controls.
+# pull_request_target: GITHUB_TOKEN is read-only on Dependabot pull_request runs.
+# Safe here only because this job never checks out PR code.
 on: pull_request_target
 
 permissions:
@@ -19,14 +11,13 @@ permissions:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'skipishere/vote'
     steps:
       - id: metadata
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@v3
 
-      - name: Enable auto-merge for non-major updates
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+      - if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
