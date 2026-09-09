@@ -1,0 +1,50 @@
+name: Dependabot commits only
+
+# Required status check backing dependabot-auto-merge.yml. Auto-merge waits for
+# required checks, so failing here blocks the merge outright -- unlike revoking
+# auto-merge after the fact, which races the CI run.
+on:
+  pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dependabot-commits-only:
+    runs-on: ubuntu-latest
+    steps:
+      # Skipped entirely unless the PR author is Dependabot, so human PRs are
+      # unaffected. A null author (commit email not mapped to a GitHub account)
+      # counts as non-Dependabot, by design.
+      - if: github.event.pull_request.user.login == 'dependabot[bot]'
+        run: |
+          set -euo pipefail
+          authors=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/commits" --paginate \
+            --jq '.[].author.login' | sort -u)
+          if [ "$authors" = 'dependabot[bot]' ]; then
+            echo "All commits authored by Dependabot."
+            exit 0
+          fi
+
+          echo "This PR contains commits not authored by Dependabot:"
+          echo "$authors"
+
+          # Latest review per person, ignoring plain comments. An approval means
+          # a human has looked at the change, which is the bar for merging it.
+          approvals=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/reviews" --paginate \
+            --jq '[.[] | select(.state != "COMMENTED")]
+                  | group_by(.user.login) | map(last)
+                  | map(select(.state == "APPROVED")) | length')
+          if [ "$approvals" -gt 0 ]; then
+            echo "Approved by a reviewer, so it can merge."
+            exit 0
+          fi
+
+          echo "Needs an approving review before it can merge."
+          exit 1
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
