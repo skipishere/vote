@@ -25,3 +25,6 @@ updates:
     groups:
       by-dependency:
         group-by: dependency-name
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
