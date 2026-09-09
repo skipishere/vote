@@ -38,5 +38,7 @@ jobs:
 
       - run: npm ci
 
-      # No test suite; dry-run bundles src/index.ts without Cloudflare creds.
+      - run: npm run typecheck
+
+      # Bundles src/index.ts against wrangler.toml; no Cloudflare creds needed.
       - run: npx wrangler deploy --dry-run
